@@ -113,46 +113,34 @@ class SpecialAdministrativeAppealRepository(BaseLawRepository):
             }
 
             if isinstance(data, dict):
-                # 특별행정심판별로 다른 래퍼 구조 확인
-                if "TtSpecialDeccSearch" in data:
-                    search_wrapper = data["TtSpecialDeccSearch"]
-                    if isinstance(search_wrapper, dict):
-                        result["total"] = search_wrapper.get("totalCnt", 0)
-                        appeals = search_wrapper.get("ttSpecialDecc", [])
-                    else:
-                        appeals = []
-                elif "ttSpecialDecc" in data:
-                    result["total"] = data.get("totalCnt", 0)
-                    appeals = data.get("ttSpecialDecc", [])
-                elif "KmstSpecialDeccSearch" in data:
-                    search_wrapper = data["KmstSpecialDeccSearch"]
-                    if isinstance(search_wrapper, dict):
-                        result["total"] = search_wrapper.get("totalCnt", 0)
-                        appeals = search_wrapper.get("kmstSpecialDecc", [])
-                    else:
-                        appeals = []
-                elif "kmstSpecialDecc" in data:
-                    result["total"] = data.get("totalCnt", 0)
-                    appeals = data.get("kmstSpecialDecc", [])
-                elif "AdapSpecialDeccSearch" in data:
-                    search_wrapper = data["AdapSpecialDeccSearch"]
-                    if isinstance(search_wrapper, dict):
-                        result["total"] = search_wrapper.get("totalCnt", 0)
-                        appeals = search_wrapper.get("adapSpecialDecc", [])
-                    else:
-                        appeals = []
-                elif "adapSpecialDecc" in data:
-                    result["total"] = data.get("totalCnt", 0)
-                    appeals = data.get("adapSpecialDecc", [])
-                else:
-                    result["total"] = data.get("totalCnt", 0)
-                    # 다양한 키 시도
-                    appeals = (data.get("decc", []) or
-                              data.get("dec", []) or
-                              data.get("ttSpecialDecc", []) or
-                              data.get("kmstSpecialDecc", []) or
-                              data.get("adapSpecialDecc", []) or
-                              data.get("data", []))
+                # law.go.kr 특별행정심판재결례 검색 응답은 공통적으로
+                #   {"Decc": {"totalCnt": "...", "decc": [ ... ]}}
+                # 래퍼를 사용한다. target=ttSpecialDecc/kmstSpecialDecc/acrSpecialDecc/adapSpecialDecc
+                # 모두 동일한 "Decc"/"decc" 구조로 내려온다.
+                # (과거 구현은 "TtSpecialDeccSearch"/"ttSpecialDecc" 등 존재하지 않는 키만 찾아
+                #  실제 데이터가 있어도 항상 0건을 반환하는 버그가 있었다.)
+                search_wrapper = None
+                for wrapper_key in ("Decc", "TtSpecialDeccSearch", "KmstSpecialDeccSearch",
+                                    "AcrSpecialDeccSearch", "AdapSpecialDeccSearch"):
+                    if isinstance(data.get(wrapper_key), dict):
+                        search_wrapper = data[wrapper_key]
+                        break
+                source = search_wrapper if search_wrapper is not None else data
+
+                raw_total = source.get("totalCnt", 0)
+                try:
+                    result["total"] = int(raw_total)
+                except (TypeError, ValueError):
+                    result["total"] = 0
+
+                appeals = (source.get("decc")
+                           or source.get("dec")
+                           or source.get("ttSpecialDecc")
+                           or source.get("kmstSpecialDecc")
+                           or source.get("acrSpecialDecc")
+                           or source.get("adapSpecialDecc")
+                           or source.get("data")
+                           or [])
 
                 if not isinstance(appeals, list):
                     appeals = [appeals] if appeals else []
