@@ -9,6 +9,7 @@ services dict 키:
 """
 from .legal_qa import handle_health, handle_legal_qa
 from .document_issue import handle_document_issue
+from .openai_compat import handle_search, handle_fetch
 from .lookup_tools import (
     handle_law_article,
     handle_law_comparison,
@@ -29,6 +30,8 @@ from .lookup_tools import (
 
 _DISPATCH_TABLE = {
     "health": handle_health,
+    "search": handle_search,
+    "fetch": handle_fetch,
     "legal_qa_tool": handle_legal_qa,
     "document_issue_tool": handle_document_issue,
     "law_article_tool": handle_law_article,

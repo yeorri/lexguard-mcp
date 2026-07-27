@@ -264,6 +264,7 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
                             _law_detail_repo,
                             _precedent_repo,
                             _interpretation_repo,
+                            _appeal_repo,
                         )
                         if resource_result.get("error"):
                             error_response = {
@@ -343,6 +344,9 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
                         "situation_guidance": situation_guidance_service,
                         "law_comparison": law_comparison_service,
                         "law_detail_repo": _law_detail_repo,
+                        "precedent_repo": _precedent_repo,
+                        "interpretation_repo": _interpretation_repo,
+                        "appeal_repo": _appeal_repo,
                     }
 
                     result = None
@@ -374,8 +378,19 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
                         final_result = copy.deepcopy(cleaned_result)
                         final_result = shrink_response_bytes(final_result)
 
-                        # MCP 표준 형식으로 변환
-                        mcp_formatted = format_mcp_response(final_result, tool_name)
+                        if tool_name in ("search", "fetch"):
+                            # ChatGPT 커넥터 규격: content에 JSON 문자열 하나만 담는다
+                            mcp_formatted = {
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": json.dumps(final_result, ensure_ascii=False),
+                                    }
+                                ]
+                            }
+                        else:
+                            # MCP 표준 형식으로 변환
+                            mcp_formatted = format_mcp_response(final_result, tool_name)
 
                         response = {
                             "jsonrpc": "2.0",

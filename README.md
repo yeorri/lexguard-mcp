@@ -355,6 +355,20 @@ docker run -p 9099:9099 -e LAW_API_KEY=your_key lexguard-mcp
 }
 ```
 
+### Method 5. ChatGPT 커넥터 (Custom Connector)
+
+이 서버는 OpenAI MCP 커넥터 규격의 `search` / `fetch` 도구를 제공하므로 ChatGPT에서도 사용할 수 있습니다.
+
+1. ChatGPT **Settings → Apps & Connectors → Advanced settings**에서 **Developer mode** 활성화 (Plus/Pro/Business 필요)
+2. **Settings → Connectors → Create**에서 커넥터 추가:
+   - **MCP Server URL**: `https://<배포주소>/mcp`
+   - **Authentication**: No authentication
+3. 채팅 입력창의 ➕ → **Developer mode**에서 커넥터를 켜면 전체 18개 도구 사용 가능
+4. **Deep Research**에서는 `search` / `fetch` 도구가 자동으로 사용됩니다
+
+`search`는 법령·판례·법령해석·행정심판 통합 검색 결과를 `{id, title, url}` 목록으로 반환하고,
+`fetch`는 그 `id`(예: `law://근로기준법/23`, `case://2023두1234`)로 전문을 조회합니다.
+
 ### API Key 발급
 
 국가법령정보센터 Open API 키가 필요합니다.
