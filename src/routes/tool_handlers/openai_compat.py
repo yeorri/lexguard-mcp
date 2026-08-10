@@ -95,7 +95,9 @@ def _pick(item: dict, keys: list) -> str:
 
 def _item_url(item: dict, config: dict, title: str) -> str:
     link = _pick(item, config.get("link_keys", []))
-    if link:
+    # DRF 상세링크에는 OC(API 키)가 쿼리로 붙어 있다. 그대로 노출하면 키가
+    # 모델 응답·클라이언트 로그에 남으므로 공개 검색 URL로 대체한다.
+    if link and "/DRF/" not in link and "OC=" not in link:
         return link if link.startswith("http") else f"{_LAW_GO_KR}{link}"
     return f"{_LAW_GO_KR}/LSW/lsSc.do?menuId=1&query={quote(title)}"
 

@@ -355,7 +355,39 @@ docker run -p 9099:9099 -e LAW_API_KEY=your_key lexguard-mcp
 }
 ```
 
-### Method 5. ChatGPT 커넥터 (Custom Connector)
+### Method 5. 로컬 stdio (Claude Desktop / Claude Code · 권장)
+
+원격 URL 방식은 호스팅 서버가 슬립·재시작되면 연결이 끊긴다. stdio 방식은 클라이언트가
+서버 프로세스를 직접 띄우고 stdin/stdout으로만 통신하므로 네트워크 단절이 없다.
+
+```bash
+git clone https://github.com/yeorri/lexguard-mcp
+cd lexguard-mcp
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt   # macOS/Linux: .venv/bin/pip
+cp env.example .env                             # LAW_API_KEY 설정
+```
+
+**Claude Code** (`~/.claude.json`) 또는 **Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "lexguard": {
+      "type": "stdio",
+      "command": "C:\\path\\to\\lexguard-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-X", "utf8", "-m", "src.stdio_server"],
+      "cwd": "C:\\path\\to\\lexguard-mcp",
+      "env": { "PYTHONIOENCODING": "utf-8" }
+    }
+  }
+}
+```
+
+서버를 미리 실행해 둘 필요가 없다. 클라이언트가 시작될 때 자동으로 띄우고 종료 시 정리한다.
+stdout은 JSON-RPC 전용이며 로그는 모두 stderr로 나간다.
+
+### Method 6. ChatGPT 커넥터 (Custom Connector)
 
 이 서버는 OpenAI MCP 커넥터 규격의 `search` / `fetch` 도구를 제공하므로 ChatGPT에서도 사용할 수 있습니다.
 
