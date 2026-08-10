@@ -206,7 +206,8 @@ async def main() -> None:
         line = await asyncio.to_thread(stdin.readline)
         if not line:
             break
-        text = line.decode("utf-8", errors="replace").strip()
+        # 일부 클라이언트가 첫 줄에 BOM을 붙여 보내면 JSON 파싱이 깨지므로 제거
+        text = line.decode("utf-8-sig", errors="replace").strip().lstrip("﻿")
         if not text:
             continue
 
