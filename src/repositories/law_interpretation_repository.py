@@ -3,6 +3,7 @@ Law Interpretation Repository - 법령해석 검색 및 조회 기능
 """
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Optional
 from .base import (
@@ -155,24 +156,10 @@ class LawInterpretationRepository(BaseLawRepository):
             }
 
             # JSON 구조 파싱
+            # 법제처 해석례는 wrapper "Expc"/키 "expc", 부처별 해석은 wrapper
+            # "CgmExpc"/키 "cgmExpc"로 서로 다르다. 하드코딩하면 조용히 0건이 된다.
             if isinstance(data, dict):
-                if "ExpcSearch" in data:
-                    expc_search = data["ExpcSearch"]
-                    if isinstance(expc_search, dict):
-                        result["total"] = expc_search.get("totalCnt", 0)
-                        interpretations = expc_search.get("expc", [])
-                    else:
-                        interpretations = []
-                elif "expc" in data:
-                    result["total"] = data.get("totalCnt", 0)
-                    interpretations = data.get("expc", [])
-                else:
-                    result["total"] = data.get("totalCnt", 0)
-                    interpretations = data.get("expc", [])
-
-                if not isinstance(interpretations, list):
-                    interpretations = [interpretations] if interpretations else []
-
+                result["total"], interpretations = parse_drf_list(data, "expc", "cgmExpc")
                 result["interpretations"] = interpretations[:per_page]
 
             if result["total"] == 0:

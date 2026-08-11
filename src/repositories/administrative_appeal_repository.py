@@ -3,6 +3,7 @@ Administrative Appeal Repository - 행정심판 검색 및 조회 기능
 """
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Optional
 from .base import (
@@ -92,23 +93,8 @@ class AdministrativeAppealRepository(BaseLawRepository):
             }
 
             if isinstance(data, dict):
-                if "DeccSearch" in data:
-                    decc_search = data["DeccSearch"]
-                    if isinstance(decc_search, dict):
-                        result["total"] = decc_search.get("totalCnt", 0)
-                        appeals = decc_search.get("decc", [])
-                    else:
-                        appeals = []
-                elif "decc" in data:
-                    result["total"] = data.get("totalCnt", 0)
-                    appeals = data.get("decc", [])
-                else:
-                    result["total"] = data.get("totalCnt", 0)
-                    appeals = data.get("decc", [])
-
-                if not isinstance(appeals, list):
-                    appeals = [appeals] if appeals else []
-
+                # 실제 wrapper는 "DeccSearch"가 아니라 "Decc"다.
+                result["total"], appeals = parse_drf_list(data, "decc")
                 result["appeals"] = appeals[:per_page]
 
             search_cache[cache_key] = result

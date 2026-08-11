@@ -3,6 +3,7 @@ Constitutional Decision Repository - 헌재결정 검색 및 조회 기능
 """
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Optional
 from .base import (
@@ -92,35 +93,9 @@ class ConstitutionalDecisionRepository(BaseLawRepository):
             }
 
             if isinstance(data, dict):
-                if "DetcSearch" in data:
-                    detc_search = data["DetcSearch"]
-                    if isinstance(detc_search, dict):
-                        total_raw = detc_search.get("totalCnt", 0)
-                        try:
-                            result["total"] = int(total_raw)
-                        except (TypeError, ValueError):
-                            result["total"] = 0
-                        decisions = detc_search.get("detc", [])
-                    else:
-                        decisions = []
-                elif "detc" in data:
-                    total_raw = data.get("totalCnt", 0)
-                    try:
-                        result["total"] = int(total_raw)
-                    except (TypeError, ValueError):
-                        result["total"] = 0
-                    decisions = data.get("detc", [])
-                else:
-                    total_raw = data.get("totalCnt", 0)
-                    try:
-                        result["total"] = int(total_raw)
-                    except (TypeError, ValueError):
-                        result["total"] = 0
-                    decisions = data.get("detc", [])
-
-                if not isinstance(decisions, list):
-                    decisions = [decisions] if decisions else []
-
+                # 데이터 키가 "Detc"(대문자 D)라 "detc"로만 찾으면
+                # totalCnt는 읽히는데 목록만 빈 채로 돌아온다.
+                result["total"], decisions = parse_drf_list(data, "detc")
                 result["decisions"] = decisions[:per_page]
 
             # total은 있는데 목록이 비어 있는 경우 메타 정보 추가

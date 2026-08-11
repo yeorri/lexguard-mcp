@@ -3,6 +3,7 @@ Administrative Rule Repository - 행정규칙 검색 기능
 """
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Optional
 from .base import (
@@ -98,35 +99,9 @@ class AdministrativeRuleRepository(BaseLawRepository):
             }
 
             if isinstance(data, dict):
-                if "AdmrulSearch" in data:
-                    admrul_search = data["AdmrulSearch"]
-                    if isinstance(admrul_search, dict):
-                        total_raw = admrul_search.get("totalCnt", 0)
-                        try:
-                            result["total"] = int(total_raw)
-                        except (TypeError, ValueError):
-                            result["total"] = 0
-                        rules = admrul_search.get("admrul", [])
-                    else:
-                        rules = []
-                elif "admrul" in data:
-                    total_raw = data.get("totalCnt", 0)
-                    try:
-                        result["total"] = int(total_raw)
-                    except (TypeError, ValueError):
-                        result["total"] = 0
-                    rules = data.get("admrul", [])
-                else:
-                    total_raw = data.get("totalCnt", 0)
-                    try:
-                        result["total"] = int(total_raw)
-                    except (TypeError, ValueError):
-                        result["total"] = 0
-                    rules = data.get("admrul", [])
-
-                if not isinstance(rules, list):
-                    rules = [rules] if rules else []
-
+                # 실제 wrapper는 "AdmRulSearch"(R 대문자)이고, 결과가 1건이면
+                # admrul이 배열이 아니라 단일 객체로 온다.
+                result["total"], rules = parse_drf_list(data, "admrul")
                 result["rules"] = rules[:per_page]
 
             # total은 있는데 목록이 비어 있는 경우 메타 정보 추가

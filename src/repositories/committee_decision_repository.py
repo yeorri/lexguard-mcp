@@ -3,6 +3,7 @@ Committee Decision Repository - 위원회 결정문 검색 및 조회 기능
 """
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Optional
 from .base import (
@@ -29,6 +30,7 @@ COMMITTEE_TARGET_MAP = {
     "중앙환경분쟁조정위원회": "ecc",  # API 문서: target=ecc
     "증권선물위원회": "sfc",  # API 문서: target=sfc
     "국가인권위원회": "nhrck",  # API 문서: target=nhrck
+    "공정거래위원회": "ftc",  # API 문서: target=ftc
 }
 
 
@@ -122,22 +124,15 @@ class CommitteeDecisionRepository(BaseLawRepository):
                 "api_url": response.url
             }
 
-            # JSON 구조 파싱 (위원회별로 다를 수 있음)
+            # JSON 구조 파싱
+            # 위원회마다 wrapper와 데이터 키가 target명 그대로다
+            # (개인정보위 Ppc/ppc, 공정위 Ftc/ftc, 노동위 Nlrc/nlrc …).
+            # 예전에는 top-level에서 dec/decision 등을 찾아 항상 0건이었다.
             if isinstance(data, dict):
-                # 다양한 가능한 키 시도
-                for key in ["totalCnt", "total", "count"]:
-                    if key in data:
-                        result["total"] = data.get(key, 0)
-                        break
-
-                # 결정문 배열 찾기
-                for key in ["dec", "decision", "decisions", "data"]:
-                    if key in data:
-                        decisions = data.get(key, [])
-                        if not isinstance(decisions, list):
-                            decisions = [decisions] if decisions else []
-                        result["decisions"] = decisions[:per_page]
-                        break
+                result["total"], decisions = parse_drf_list(
+                    data, target, "dec", "decision", "decisions"
+                )
+                result["decisions"] = decisions[:per_page]
 
             search_cache[cache_key] = result
             return result

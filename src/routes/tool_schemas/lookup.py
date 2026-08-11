@@ -1,5 +1,9 @@
 """단순 조회 도구 스키마 8종: 판례·해석·심판·위원회·자치법규·행정규칙."""
+from ...repositories.committee_decision_repository import COMMITTEE_TARGET_MAP
 from ._common import DISCLAIMER
+
+# 위원회 명칭은 저장소 매핑과 어긋나면 조용히 0건이 되므로 스키마에서 열거한다.
+_COMMITTEE_NAMES = sorted(COMMITTEE_TARGET_MAP)
 
 SCHEMAS = [
     {
@@ -128,7 +132,11 @@ SCHEMAS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "committee_type": {"type": "string", "description": "위원회 명칭 (저장소 COMMITTEE_TARGET_MAP 키와 일치)"},
+                "committee_type": {
+                    "type": "string",
+                    "enum": _COMMITTEE_NAMES,
+                    "description": "위원회 명칭. 아래 목록의 값만 사용하세요.",
+                },
                 "query": {"type": "string", "description": "결정문 검색어"},
                 "page": {"type": "integer", "default": 1, "minimum": 1},
                 "per_page": {"type": "integer", "default": 10, "minimum": 1, "maximum": 50},
