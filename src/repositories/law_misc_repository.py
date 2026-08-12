@@ -3,6 +3,7 @@ Law Misc Repository - 영문법령·조약·체계도·한눈보기·약칭·삭
 """
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Optional
 from .base import (
@@ -17,32 +18,13 @@ from .base import (
 
 
 def _parse_search_result(data: dict, list_key: str) -> tuple:
-    """공통 목록 응답 파싱. (total, items) 반환."""
-    total = 0
-    items = []
-    if not isinstance(data, dict):
-        return total, items
+    """공통 목록 응답 파싱. (total, items) 반환.
 
-    # 상위 wrapper key 탐색 (예: ElawSearch, TrtySearch 등)
-    for v in data.values():
-        if isinstance(v, dict) and list_key in v:
-            try:
-                total = int(v.get("totalCnt", 0))
-            except (TypeError, ValueError):
-                total = 0
-            items = v.get(list_key, [])
-            break
-    else:
-        # flat 구조
-        try:
-            total = int(data.get("totalCnt", 0))
-        except (TypeError, ValueError):
-            total = 0
-        items = data.get(list_key, [])
-
-    if not isinstance(items, list):
-        items = [items] if items else []
-    return total, items
+    실측 결과 이 계열은 target명과 데이터 키가 거의 일치하지 않는다.
+    조약은 Trty(대문자), 영문법령·약칭·삭제이력은 law, 한눈보기는 item을 쓴다.
+    그래서 target명만 믿지 않고 공통 파서에 후보를 함께 넘긴다.
+    """
+    return parse_drf_list(data, list_key, "law", "item")
 
 
 class LawMiscRepository(BaseLawRepository):

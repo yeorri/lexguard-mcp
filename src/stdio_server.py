@@ -38,6 +38,7 @@ from .repositories.law_detail import LawDetailRepository  # noqa: E402
 from .repositories.precedent_repository import PrecedentRepository  # noqa: E402
 from .repositories.law_interpretation_repository import LawInterpretationRepository  # noqa: E402
 from .repositories.administrative_appeal_repository import AdministrativeAppealRepository  # noqa: E402
+from .repositories.legal_term_repository import LegalTermRepository  # noqa: E402
 from .routes.mcp_routes import _build_prompts_list, _get_prompt  # noqa: E402
 from .routes.resource_handlers import build_resources_list, read_resource  # noqa: E402
 from .routes.tool_handlers import dispatch  # noqa: E402
@@ -58,6 +59,7 @@ _law_detail_repo = LawDetailRepository()
 _precedent_repo = PrecedentRepository()
 _interpretation_repo = LawInterpretationRepository()
 _appeal_repo = AdministrativeAppealRepository()
+_legal_term_repo = LegalTermRepository()
 
 _SERVICES = {
     "health": _health_service,
@@ -68,6 +70,7 @@ _SERVICES = {
     "precedent_repo": _precedent_repo,
     "interpretation_repo": _interpretation_repo,
     "appeal_repo": _appeal_repo,
+    "legal_term_repo": _legal_term_repo,
 }
 
 

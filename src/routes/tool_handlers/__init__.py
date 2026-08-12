@@ -10,6 +10,7 @@ services dict 키:
 from .legal_qa import handle_health, handle_legal_qa
 from .document_issue import handle_document_issue
 from .openai_compat import handle_search, handle_fetch
+from .knowledge import handle_legal_term, handle_ai_search, handle_school_rule
 from .lookup_tools import (
     handle_law_article,
     handle_law_comparison,
@@ -49,6 +50,9 @@ _DISPATCH_TABLE = {
     "law_info_tool": handle_law_info,
     "law_form_tool": handle_law_form,
     "law_link_tool": handle_law_link,
+    "legal_term_tool": handle_legal_term,
+    "ai_search_tool": handle_ai_search,
+    "school_rule_tool": handle_school_rule,
 }
 
 

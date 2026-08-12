@@ -87,3 +87,30 @@ def test_totalCnt가_없으면_건수로_대체():
     total, items = parse_drf_list(data, "ppc")
     assert total == 2
     assert len(items) == 2
+
+
+def test_용어연계는_두단계_중첩():
+    """lstrmRlt는 wrapper > 법령용어 > 연계용어 로 한 단계 더 들어간다."""
+    data = {
+        "lstrmRltService": {
+            "검색결과개수": "2",
+            "키워드": "소득",
+            "법령용어": {"id": "1", "연계용어": [{"일상용어명": "가구소득"}, {"일상용어명": "중간소득"}]},
+        }
+    }
+    total, items = parse_drf_list(data, "연계용어")
+    assert total == 2
+    assert items[0]["일상용어명"] == "가구소득"
+
+
+def test_후보키가_있으면_바깥dict를_데이터로_오인하지_않음():
+    """1차 탐색이 fallback보다 먼저 돌아야 한다."""
+    data = {"S": {"바깥": {"안쪽목록": [{"a": 1}]}}}
+    _, items = parse_drf_list(data, "안쪽목록")
+    assert items == [{"a": 1}]
+
+
+def test_검색결과개수도_총건수로_인식():
+    data = {"X": {"검색결과개수": "7", "법령용어": {"연계용어": [{"a": 1}]}}}
+    total, _ = parse_drf_list(data, "연계용어")
+    assert total == 7

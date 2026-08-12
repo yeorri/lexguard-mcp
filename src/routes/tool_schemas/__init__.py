@@ -1,9 +1,10 @@
 """tool_schemas 패키지 — 18개 MCP 도구 스키마를 모듈별로 분리하고 TOOLS_LIST로 통합."""
-from . import integrated, law, lookup, extended, utility, openai_compat
+from . import integrated, law, lookup, extended, utility, openai_compat, knowledge
 
 TOOLS_LIST = (
     openai_compat.SCHEMAS
     + integrated.SCHEMAS
+    + knowledge.SCHEMAS
     + law.SCHEMAS
     + lookup.SCHEMAS
     + extended.SCHEMAS

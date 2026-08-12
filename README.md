@@ -183,6 +183,34 @@ MCP 서버 동작 여부, API Key 설정 상태, 환경 변수를 확인합니�
 | `special_administrative_appeal_tool` | 특별행정심판원 재결 | `tribunal_type`, `query` |
 | `local_ordinance_tool` | 자치법규(조례 등)만 | `query` 또는 `local_government` 중 하나 이상 |
 | `administrative_rule_tool` | 행정규칙만 | `query` 또는 `agency` 중 하나 이상 |
+| `school_rule_tool` | 학칙·공단·공공기관 내부 규정 | `query` |
+
+---
+
+### 지식베이스 툴
+
+#### `legal_term_tool` — 법령용어·일상용어·용어 연계
+
+일상 표현만 아는 상태에서 정확한 법령용어를 찾거나, 특정 용어가 어느 조문에 쓰이는지 확인합니다.
+
+| operation | 내용 | target |
+|-----------|------|--------|
+| `법령용어` | 법령이 정의한 용어 검색 | `lstrm` |
+| `지식베이스용어` | 지능형 지식베이스 법령용어 | `lstrmAI` |
+| `일상용어` | 법령용어에 대응하는 일상 표현 | `dlytrm` |
+| `용어-일상용어연계` | 법령용어 ↔ 일상용어 (상위어·하위어 관계 포함) | `lstrmRlt` |
+| `일상용어-용어연계` | 일상용어 → 법령용어 | `dlytrmRlt` |
+| `용어-조문연계` | 그 용어가 실제로 쓰인 조문 목록 | `lstrmRltJo` |
+
+#### `ai_search_tool` — 지능형 법령검색
+
+키워드가 정확히 일치하지 않아도 의미 기반으로 조문을 찾습니다. 조문 번호를 모르고 상황만 알 때 유용합니다.
+
+| operation | 내용 | 입력 |
+|-----------|------|------|
+| `조문검색` | 자연어 질의로 관련 조문 검색 (`aiSearch`) | `query` |
+| `연관법령` | 질의와 연관된 법령 목록 (`aiRltLs`) | `query` |
+| `관련법령` | 특정 법령의 관련법령 (`lsRlt`) | `law_id` |
 
 ---
 

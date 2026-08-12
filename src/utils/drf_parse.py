@@ -39,21 +39,25 @@ def _to_int(value: Any) -> int:
         return 0
 
 
-def _find_items(container: dict, candidates: Tuple[str, ...]) -> Any:
-    """container에서 데이터 배열을 찾는다. 못 찾으면 None."""
+def _lookup(container: dict, candidates: Tuple[str, ...]) -> Any:
+    """지정된 후보 키를 대소문자 무시하고 찾는다. 못 찾으면 None."""
     if not isinstance(container, dict):
         return None
-
     lowered = {k.lower(): k for k in container}
-
-    # 1) 지정된 후보 키를 대소문자 무시하고 탐색
     for cand in candidates:
         actual = lowered.get(cand.lower())
         if actual is not None:
             return container[actual]
+    return None
 
-    # 2) 후보가 없으면 메타가 아닌 첫 list/dict 값을 데이터로 본다
-    #    (위원회처럼 target마다 키가 다른 경우를 커버)
+
+def _fallback(container: dict) -> Any:
+    """메타가 아닌 첫 list/dict 값을 데이터로 본다.
+
+    위원회처럼 target마다 데이터 키 이름이 다른 경우를 커버한다.
+    """
+    if not isinstance(container, dict):
+        return None
     for key, value in container.items():
         if key.lower() in _META_KEYS:
             continue
@@ -61,7 +65,6 @@ def _find_items(container: dict, candidates: Tuple[str, ...]) -> Any:
             return value
         if isinstance(value, dict) and value and not _is_wrapper(value):
             return value
-
     return None
 
 
@@ -88,20 +91,42 @@ def parse_drf_list(data: Any, *candidate_keys: str) -> Tuple[int, List[dict]]:
     if not isinstance(data, dict) or not data:
         return 0, []
 
-    # wrapper가 있는 구조와 평면 구조를 모두 시도한다.
-    # wrapper 안에 totalCnt가 있는 것이 일반적이므로 wrapper를 먼저 본다.
-    containers = [v for v in data.values() if isinstance(v, dict)]
-    containers.append(data)
+    # 탐색 대상: wrapper(1단) → 평면 → 2단 중첩.
+    # 용어 연계 API처럼 실제 목록이 wrapper > 법령용어 > 연계용어 로
+    # 한 단계 더 들어가 있는 경우가 있다.
+    level1 = [v for v in data.values() if isinstance(v, dict)]
+    level2 = [v for c in level1 for v in c.values() if isinstance(v, dict)]
+    containers = level1 + [data] + level2
 
+    # 총건수는 데이터가 있는 단계가 아니라 상위 wrapper에 있을 수 있으므로
+    # (예: lstrmRltService.검색결과개수) 모든 단계를 후보로 둔다.
+    count_sources = [data] + level1 + level2
+
+    # 1차: 지정된 후보 키를 모든 단계에서 먼저 찾는다.
+    #      (fallback을 먼저 돌리면 바깥 dict를 데이터로 오인한다)
+    if candidate_keys:
+        for container in containers:
+            items = _lookup(container, candidate_keys)
+            if items is not None:
+                return _finish(items, container, count_sources)
+
+    # 2차: 후보가 없거나 못 찾으면 메타가 아닌 첫 list/dict를 데이터로 본다.
     for container in containers:
-        items = _find_items(container, candidate_keys)
-        if items is None:
-            continue
-        if not isinstance(items, list):
-            items = [items] if items else []
-        total = _to_int(container.get("totalCnt"))
-        if total == 0:
-            total = _to_int(data.get("totalCnt")) or len(items)
-        return total, items
+        items = _fallback(container)
+        if items is not None:
+            return _finish(items, container, count_sources)
 
     return 0, []
+
+
+def _finish(items: Any, container: dict, count_sources: List[dict]) -> Tuple[int, List[dict]]:
+    if not isinstance(items, list):
+        items = [items] if items else []
+
+    for key in ("totalCnt", "검색결과개수"):
+        for src in [container, *count_sources]:
+            total = _to_int(src.get(key))
+            if total:
+                return total, items
+
+    return len(items), items
