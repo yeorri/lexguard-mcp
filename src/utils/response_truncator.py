@@ -1,6 +1,14 @@
 """
 응답 크기 제한 유틸리티
-MCP 규격에 따라 응답을 24KB 이하로 제한합니다.
+
+한도를 넘으면 목록을 줄이고, 그래도 크면 긴 문자열을 자른다.
+
+한도 설정 근거: 조문 하나가 온전히 들어가야 한다.
+소득세법 시행령 제167조의3처럼 호가 많은 조문은 본문만 약 15,000자
+(UTF-8 약 40KB)이고, MCP 응답은 content 텍스트와 structuredContent에
+같은 내용을 두 번 담으므로 약 80KB가 된다.
+한도가 24KB이던 시절에는 이런 조문이 500자로 잘려 각 호가 통째로
+사라졌다 — 조문 조회 도구로서는 결과가 없는 것만 못하다.
 """
 import json
 import logging
@@ -8,10 +16,15 @@ from typing import Dict, Any
 
 logger = logging.getLogger("lexguard-mcp")
 
-# MCP 규격: 최대 응답 크기 24KB (JSONRPC wrapper 포함)
-MAX_RESPONSE_SIZE = 24076  # bytes
+# 긴 조문 하나가 중복 저장(content + structuredContent)돼도 들어갈 크기
+MAX_RESPONSE_SIZE = 120000  # bytes
 RESERVE_SIZE = 500  # JSON 구조용 여유 공간 (메타데이터, 필드명 등)
 TARGET_SIZE = MAX_RESPONSE_SIZE - RESERVE_SIZE  # 실제 콘텐츠용 크기
+
+# 문자열 절단은 최후의 수단이다. 조문 본문을 500자로 자르면 쓸모가 없어지므로
+# 임계값을 크게 잡고, 자를 때도 충분히 남긴다.
+FIELD_TRUNCATE_THRESHOLD = 60000  # bytes — 이보다 큰 문자열만 절단 대상
+FIELD_TRUNCATE_KEEP = 30000  # chars — 절단 시 남길 분량
 
 
 def truncate_response(result: Dict[str, Any], max_size: int = TARGET_SIZE) -> Dict[str, Any]:
@@ -166,32 +179,38 @@ def aggressive_truncate(result: Dict[str, Any], max_size: int) -> Dict[str, Any]
     """
     truncated = result.copy()
 
-    # content 필드의 텍스트를 더 짧게
-    if "content" in truncated and isinstance(truncated["content"], list):
-        for item in truncated["content"]:
-            if isinstance(item, dict) and "text" in item:
-                text = item.get("text", "")
-                if isinstance(text, str):
-                    # 최대 크기의 1/3로 제한
-                    item["text"] = summarize_text(text, max_size // 3)
-                    item["truncated"] = True
-                    item["aggressive_truncation"] = True
-
-    # 큰 문자열 필드 축소
-    for key, value in list(truncated.items()):
-        if isinstance(value, str) and key not in ["api_url", "error"]:
-            value_bytes = len(value.encode('utf-8'))
-            if value_bytes > 1000:  # 1KB 이상이면 축소
-                truncated[key] = value[:500] + "... [truncated]"
-                logger.info(f"Field truncated: {key}")
-
-    # 리스트를 더 짧게
+    # 1) 목록부터 줄인다. 검색 결과 개수를 줄이는 것이
+    #    본문을 자르는 것보다 손실이 훨씬 적다.
     for key, value in list(truncated.items()):
         if isinstance(value, list) and len(value) > 5:
             truncated[key] = value[:5]
             truncated[f"{key}_truncated"] = True
             truncated[f"{key}_total"] = len(value)
             truncated[f"{key}_showing"] = 5
+
+    if get_response_size(truncated) <= max_size:
+        return truncated
+
+    # 2) 그래도 크면 content 텍스트를 줄인다.
+    if "content" in truncated and isinstance(truncated["content"], list):
+        for item in truncated["content"]:
+            if isinstance(item, dict) and "text" in item:
+                text = item.get("text", "")
+                if isinstance(text, str) and len(text.encode("utf-8")) > max_size // 2:
+                    item["text"] = summarize_text(text, max_size // 2)
+                    item["truncated"] = True
+                    item["aggressive_truncation"] = True
+
+    if get_response_size(truncated) <= max_size:
+        return truncated
+
+    # 3) 마지막으로 아주 긴 문자열 필드를 자른다.
+    #    조문 본문이 여기 걸리면 실무에서 쓸 수 없게 되므로 임계값을 높게 둔다.
+    for key, value in list(truncated.items()):
+        if isinstance(value, str) and key not in ["api_url", "error"]:
+            if len(value.encode("utf-8")) > FIELD_TRUNCATE_THRESHOLD:
+                truncated[key] = value[:FIELD_TRUNCATE_KEEP] + "... [truncated]"
+                logger.info("Field truncated: %s", key)
 
     return truncated
 

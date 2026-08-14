@@ -3,10 +3,36 @@ import logging
 
 logger = logging.getLogger("lexguard-mcp")
 
+# operation을 생략하거나 다른 표현으로 보내는 호출이 흔하다.
+# 필수로 막으면 가장 자연스러운 호출(query만 전달)이 그대로 실패한다.
+_TERM_ALIASES = {
+    "법령용어": "법령용어", "term": "법령용어", "용어": "법령용어",
+    "지식베이스용어": "지식베이스용어", "kb": "지식베이스용어", "lstrmai": "지식베이스용어",
+    "일상용어": "일상용어", "daily": "일상용어", "dlytrm": "일상용어",
+    "용어-일상용어연계": "용어-일상용어연계", "용어→일상용어": "용어-일상용어연계",
+    "일상용어-용어연계": "일상용어-용어연계", "일상용어→용어": "일상용어-용어연계",
+    "용어-조문연계": "용어-조문연계", "용어→조문": "용어-조문연계", "조문연계": "용어-조문연계",
+}
+
+_AI_ALIASES = {
+    "조문검색": "조문검색", "search": "조문검색", "검색": "조문검색",
+    "법령검색": "조문검색", "aisearch": "조문검색",
+    "연관법령": "연관법령", "related": "연관법령", "airltls": "연관법령",
+    "관련법령": "관련법령", "lsrlt": "관련법령", "related_laws": "관련법령",
+}
+
+
+def _normalize(value, aliases: dict, default: str) -> str:
+    """operation 값을 표준 명칭으로 바꾼다. 없거나 모르면 기본값."""
+    if not value:
+        return default
+    key = str(value).strip().lower().replace(" ", "").replace("_", "")
+    return aliases.get(key) or aliases.get(str(value).strip()) or default
+
 
 async def handle_legal_term(arguments: dict, services: dict) -> dict:
     repo = services["legal_term_repo"]
-    operation = arguments.get("operation")
+    operation = _normalize(arguments.get("operation"), _TERM_ALIASES, "법령용어")
     query = (arguments.get("query") or "").strip()
     page = int(arguments.get("page", 1))
     per_page = int(arguments.get("per_page", 20))
@@ -40,7 +66,10 @@ async def handle_legal_term(arguments: dict, services: dict) -> dict:
 
 async def handle_ai_search(arguments: dict, services: dict) -> dict:
     repo = services["legal_term_repo"]
-    operation = arguments.get("operation")
+    raw_op = arguments.get("operation")
+    # law_id만 주고 operation을 생략하면 관련법령 조회 의도로 본다.
+    default_op = "관련법령" if (not raw_op and arguments.get("law_id")) else "조문검색"
+    operation = _normalize(raw_op, _AI_ALIASES, default_op)
     query = (arguments.get("query") or "").strip()
     page = int(arguments.get("page", 1))
     per_page = int(arguments.get("per_page", 20))
