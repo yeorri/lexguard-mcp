@@ -291,6 +291,10 @@ class BaseLawRepository:
             return "000000"
         article_str = str(article_str).strip()
 
+        # 이미 6자리 JO 코드로 들어온 경우 그대로 사용 (예: '015603')
+        if re.fullmatch(r"\d{6}", article_str):
+            return article_str
+
         # 숫자 추출
         numbers = re.findall(r"\d+", article_str)
         if not numbers:
@@ -298,14 +302,17 @@ class BaseLawRepository:
 
         main_num = int(numbers[0])
 
-        # '의' 뒤의 숫자 확인 (예: '제10조의2')
-        if "의" in article_str and len(numbers) > 1:
-            sub_num = int(numbers[1])
-            # 6자리: 앞 4자리는 조 번호, 뒤 2자리는 '의' 뒤 숫자
+        # 가지번호 구분자: '의' 외에 하이픈·점·언더바도 실무에서 쓰인다.
+        # 구분자를 '의'로만 보면 '156-3'이 조용히 제156조로 해석되어
+        # 전혀 다른 조문을 반환한다.
+        branch = re.search(r"\d+\s*(?:조)?\s*(?:의|[-._])\s*(\d+)", article_str)
+        if branch:
+            sub_num = int(branch.group(1))
+            # 6자리: 앞 4자리는 조 번호, 뒤 2자리는 가지번호
             return f"{main_num:04d}{sub_num:02d}"
-        else:
-            # 6자리: 앞 4자리는 본 번호, 뒤 2자리는 00
-            return f"{main_num:04d}00"
+
+        # 6자리: 앞 4자리는 본 번호, 뒤 2자리는 00
+        return f"{main_num:04d}00"
 
     @staticmethod
     def parse_mok(mok_str: str) -> str:

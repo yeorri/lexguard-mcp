@@ -388,6 +388,31 @@ def _read_lexguard_static(uri: str, identifier: str) -> dict:
     }
 
 
+def _format_article_label(article_number: str) -> str:
+    """조문번호를 원문 표기로 되돌린다.
+
+    '156의3', '156-3', '015603'이 모두 들어올 수 있는데 그대로 '제156의3조'로
+    쓰면 원문 표기(제156조의3)와 어긋나 인용할 때 혼동을 준다.
+    """
+    import re
+
+    raw = str(article_number or "").strip()
+    if not raw:
+        return "조문"
+
+    if re.fullmatch(r"\d{6}", raw):
+        main, sub = int(raw[:4]), int(raw[4:])
+    else:
+        nums = re.findall(r"\d+", raw)
+        if not nums:
+            return f"제{raw}조"
+        main = int(nums[0])
+        branch = re.search(r"\d+\s*(?:조)?\s*(?:의|[-._])\s*(\d+)", raw)
+        sub = int(branch.group(1)) if branch else 0
+
+    return f"제{main}조의{sub}" if sub else f"제{main}조"
+
+
 def _single_article_to_text(law_name: str, article_number: str, result: dict) -> str:
     sub = []
     if result.get("hang"):
@@ -397,7 +422,7 @@ def _single_article_to_text(law_name: str, article_number: str, result: dict) ->
     if result.get("mok"):
         sub.append(f"목 {result.get('mok')}")
     sub_s = (" " + ", ".join(sub)) if sub else ""
-    lines = [f"[조문] {law_name} 제{article_number}조{sub_s} (표기는 원문과 다를 수 있음)"]
+    lines = [f"[조문] {law_name} {_format_article_label(article_number)}{sub_s}"]
     title = result.get("title") or result.get("조문제목")
     content = result.get("content") or result.get("조문내용")
     if title:
