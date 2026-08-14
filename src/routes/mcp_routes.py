@@ -379,7 +379,6 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
 
                         cleaned_result = sanitize_for_mcp_json(cleaned_result)
                         final_result = copy.deepcopy(cleaned_result)
-                        final_result = shrink_response_bytes(final_result)
 
                         if tool_name in ("search", "fetch"):
                             # ChatGPT 커넥터 규격: content에 JSON 문자열 하나만 담는다
@@ -394,6 +393,11 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
                         else:
                             # MCP 표준 형식으로 변환
                             mcp_formatted = format_mcp_response(final_result, tool_name)
+
+                        # 크기 제한은 반드시 포맷 변환 뒤에 적용한다.
+                        # shrink_response_bytes는 structuredContent가 있을 때만
+                        # 축소하는데 그 키는 format_mcp_response가 만든다.
+                        mcp_formatted = shrink_response_bytes(mcp_formatted)
 
                         response = {
                             "jsonrpc": "2.0",

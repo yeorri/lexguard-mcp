@@ -116,12 +116,19 @@ async def _call_tool(tool_name: str, arguments: dict) -> dict:
         result = {"error": "Tool returned no result"}
 
     result = sanitize_for_mcp_json(result)
-    result = shrink_response_bytes(result)
 
     if tool_name in ("search", "fetch"):
         # ChatGPT 커넥터 규격: content에 JSON 문자열 하나만
-        return {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]}
-    return format_mcp_response(result, tool_name)
+        formatted = {
+            "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]
+        }
+    else:
+        formatted = format_mcp_response(result, tool_name)
+
+    # 크기 제한은 MCP 포맷으로 변환한 뒤에 적용해야 한다.
+    # shrink_response_bytes는 structuredContent가 있을 때만 축소하는데,
+    # 그 키는 format_mcp_response가 만든다. 변환 전에 부르면 무조건 무효였다.
+    return shrink_response_bytes(formatted)
 
 
 async def handle_message(message: dict) -> dict | None:
