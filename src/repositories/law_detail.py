@@ -1209,10 +1209,46 @@ class LawDetailRepository(BaseLawRepository):
                     }
 
                 if not (article_content and str(article_content).strip()):
+                    # 본문이 없는데 성공으로 보고하면 존재하지 않는 조문을
+                    # 조회했을 때도 그럴듯한 응답이 돌아가 오인용 위험이 있다.
+                    # (formatter가 error 유무로 success를 정하므로 error를 채운다)
+                    result["error_code"] = "ARTICLE_NOT_FOUND"
+                    result["error"] = (
+                        f"법령ID {law_id} 제{article_number}조"
+                        + (f" 제{hang}항" if hang else "")
+                        + (f" 제{ho}호" if ho else "")
+                        + "의 본문을 찾지 못했습니다."
+                    )
+                    result["recovery_guide"] = (
+                        "조문번호가 실제로 존재하는지 확인하세요. "
+                        "가지번호는 '167의3' 형식으로 지정합니다. "
+                        "조문번호를 모르면 ai_search_tool(조문검색)으로 내용 기반 검색을 하세요."
+                    )
                     result["note"] = (
                         "조문 내용이 비어있거나 찾을 수 없습니다. API 응답을 확인하세요."
                     )
                     result["raw_data"] = str(data)[:500]  # 디버깅용
+                elif hang or ho or mok:
+                    # 항·호·목을 지정했는데 조 제목만 돌아오면 그 항·호를
+                    # 찾지 못한 것이다. 성공으로 넘기면 조 제목을 해당 항의
+                    # 내용으로 오인하게 된다.
+                    body = str(article_content).strip()
+                    title_txt = str(article_title or "").strip()
+                    title_only = bool(title_txt) and title_txt in body and len(body) <= len(title_txt) + 14
+                    if title_only:
+                        위치 = (
+                            (f" 제{hang}항" if hang else "")
+                            + (f" 제{ho}호" if ho else "")
+                            + (f" {mok}목" if mok else "")
+                        )
+                        result["error_code"] = "SUBSECTION_NOT_FOUND"
+                        result["error"] = (
+                            f"제{article_number}조는 찾았으나{위치}에 해당하는 내용을 찾지 못했습니다."
+                        )
+                        result["recovery_guide"] = (
+                            "항·호 번호가 실제로 존재하는지 확인하거나, "
+                            "항·호를 빼고 조 단위로 조회한 뒤 해당 부분을 찾으세요."
+                        )
 
                 logger.debug(
                     "Successfully retrieved single article | law_id=%s article=%s",
@@ -1289,6 +1325,9 @@ class LawDetailRepository(BaseLawRepository):
         logger.debug(
             "get_law called | law_id=%s law_name=%s mode=%s", law_id, law_name, mode
         )
+
+        # 약칭('조특법' 등)은 DRF 검색이 인식하지 못하므로 정식 명칭으로 바꾼다
+        law_name = self.resolve_law_name(law_name)
 
         # law_id 또는 law_name 중 하나는 필수
         if not law_id and not law_name:

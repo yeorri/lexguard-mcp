@@ -145,3 +145,25 @@ def test_직렬화_불가_타입도_응답이_깨지지_않는다():
     payload = {"jsonrpc": "2.0", "id": 1, "result": {"api_url": httpx.URL("https://x.test/a?b=1")}}
     out = json.dumps(payload, ensure_ascii=False, default=str)
     assert "https://x.test/a?b=1" in out
+
+
+# --------------------------------------------------------------------------
+# 조문 직접 조회: 약칭 해석
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("조특법", "조세특례제한법"),
+        ("조특령", "조세특례제한법 시행령"),
+        ("상증법", "상속세 및 증여세법"),
+        ("부가법", "부가가치세법"),
+        # 매핑에 없으면 그대로 통과해야 한다
+        ("소득세법", "소득세법"),
+        ("소득세법 시행령", "소득세법 시행령"),
+        (None, None),
+    ],
+)
+def test_법령_약칭_해석(raw, expected):
+    from src.repositories.base import BaseLawRepository
+
+    assert BaseLawRepository.resolve_law_name(raw) == expected

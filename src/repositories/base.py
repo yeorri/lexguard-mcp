@@ -87,6 +87,43 @@ DRF_REQUEST_TIMEOUT_LONG_SEC = 30
 class BaseLawRepository:
     """법령 Repository의 기본 클래스 - 공통 유틸리티 메서드"""
 
+    # 실무에서 흔히 쓰는 법령 약칭 → 정식 명칭.
+    # DRF 법령 검색은 일부 약칭만 인식해서('상증법'은 되고 '조특법'은 안 됨)
+    # 약칭으로 부르면 "법령 ID를 찾을 수 없습니다"로 끝난다.
+    # 공식 약칭 API(target=lsAbrv)는 검색어를 무시하고 전체 목록만 돌려주므로
+    # 조회 경로로 쓸 수 없어 자주 쓰는 것만 직접 매핑한다.
+    LAW_NAME_ALIASES: dict = {
+        "조특법": "조세특례제한법",
+        "조특령": "조세특례제한법 시행령",
+        "조특칙": "조세특례제한법 시행규칙",
+        "상증법": "상속세 및 증여세법",
+        "상증령": "상속세 및 증여세법 시행령",
+        "소득법": "소득세법",
+        "소득령": "소득세법 시행령",
+        "소령": "소득세법 시행령",
+        "법인법": "법인세법",
+        "법인령": "법인세법 시행령",
+        "부가법": "부가가치세법",
+        "부가령": "부가가치세법 시행령",
+        "국기법": "국세기본법",
+        "국징법": "국세징수법",
+        "지방세법": "지방세법",
+        "종부세법": "종합부동산세법",
+        "개인정보법": "개인정보 보호법",
+        "근기법": "근로기준법",
+        "주임법": "주택임대차보호법",
+        "상임법": "상가건물 임대차보호법",
+        "민집법": "민사집행법",
+    }
+
+    @classmethod
+    def resolve_law_name(cls, law_name: Optional[str]) -> Optional[str]:
+        """약칭이면 정식 명칭으로 바꾼다. 매핑에 없으면 그대로 반환."""
+        if not law_name:
+            return law_name
+        key = str(law_name).strip()
+        return cls.LAW_NAME_ALIASES.get(key, key)
+
     @staticmethod
     def get_api_key(arguments: Optional[dict] = None) -> str:
         """
