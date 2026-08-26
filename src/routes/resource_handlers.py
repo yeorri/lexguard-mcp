@@ -11,6 +11,10 @@ from typing import Optional
 
 logger = logging.getLogger("lexguard-mcp")
 
+# 조문 본문 상한. 응답 전체 크기는 response_truncator가 따로 제한하므로
+# 여기서는 조문 하나가 온전히 들어갈 만큼 넉넉히 둔다.
+ARTICLE_TEXT_LIMIT = 40000
+
 # ---------------------------------------------------------------------------
 # 클라이언트용 통합 안내 (resources/read: lexguard://integration-handbook)
 # ---------------------------------------------------------------------------
@@ -428,7 +432,9 @@ def _single_article_to_text(law_name: str, article_number: str, result: dict) ->
     if title:
         lines.append(str(title))
     if content:
-        lines.append(str(content)[:4000])
+        # 호가 많은 조문은 본문만 15,000자를 넘는다(예: 소득세법 시행령 제167조의3).
+        # 4,000자로 자르면 뒤쪽 호가 통째로 사라져 조문 조회로 쓸 수 없다.
+        lines.append(str(content)[:ARTICLE_TEXT_LIMIT])
     if result.get("fallback"):
         lines.append(f"\n[폴백] {result.get('fallback')}")
     return "\n".join(lines)

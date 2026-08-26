@@ -102,6 +102,60 @@ def _item_url(item: dict, config: dict, title: str) -> str:
     return f"{_LAW_GO_KR}/LSW/lsSc.do?menuId=1&query={quote(title)}"
 
 
+async def _ai_search_fallback(query: str, services: dict, arguments: dict) -> list:
+    """지능형 법령검색(aiSearch)으로 조문을 찾는다.
+
+    DRF의 law 타입은 '법령 이름'만 검색하므로 '1세대 3주택 중과' 같은
+    문장형 질의에는 아무것도 걸리지 않는다. ChatGPT 딥리서치처럼
+    자연어로 물어오는 경우가 많아 의미 기반 검색으로 보완한다.
+    """
+    repo = services.get("legal_term_repo")
+    if repo is None:
+        return []
+    try:
+        res = await repo.ai_search(query, 1, 10, arguments)
+    except Exception as e:
+        logger.error("search fallback error | query=%s error=%s", query, e, exc_info=True)
+        return []
+
+    results = []
+    for item in (res.get("articles") or []):
+        if not isinstance(item, dict):
+            continue
+        law_name = (item.get("법령명") or "").strip()
+        if not law_name:
+            continue
+        try:
+            article = int(item.get("조문번호") or 0)
+        except (TypeError, ValueError):
+            article = 0
+        try:
+            branch = int(item.get("조문가지번호") or 0)
+        except (TypeError, ValueError):
+            branch = 0
+
+        if article:
+            ref = f"{article}의{branch}" if branch else str(article)
+            doc_id = f"law://{law_name}/{ref}"
+            label = f"제{article}조의{branch}" if branch else f"제{article}조"
+        else:
+            doc_id = f"law://{law_name}"
+            label = ""
+
+        body = (item.get("조문내용") or "").strip().replace("\n", " ")
+        title = f"{law_name} {label}".strip()
+        if body:
+            title = f"{title} — {body[:60]}"
+        results.append({
+            "id": doc_id,
+            "title": title,
+            "url": f"{_LAW_GO_KR}/LSW/lsSc.do?menuId=1&query={quote(law_name)}",
+        })
+        if len(results) >= _MAX_RESULTS:
+            break
+    return results
+
+
 async def handle_search(arguments: dict, services: dict) -> dict:
     query = (arguments.get("query") or "").strip()
     if not query:
@@ -155,7 +209,12 @@ async def handle_search(arguments: dict, services: dict) -> dict:
         if len(results) >= _MAX_RESULTS:
             break
 
-    logger.info("search tool | query=%s results=%d", query, len(results))
+    if not results:
+        # 법령명 검색으로 안 걸리는 문장형 질의는 의미 기반 검색으로 보완
+        results = await _ai_search_fallback(query, services, arguments)
+        logger.info("search tool | query=%s fallback=aiSearch results=%d", query, len(results))
+    else:
+        logger.info("search tool | query=%s results=%d", query, len(results))
     return {"results": results}
 
 
