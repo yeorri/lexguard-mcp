@@ -207,7 +207,7 @@ class LawSearchRepository(BaseLawRepository):
                     return {
                         "error": error_msg,
                         "query": normalized_query,
-                        "api_url": response.url,
+                        "api_url": str(response.url),
                         "raw_response": response.text[:500],
                         "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                     }
@@ -220,7 +220,7 @@ class LawSearchRepository(BaseLawRepository):
                 "per_page": per_page,
                 "total": 0,
                 "laws": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             # JSON 구조 파싱 (여러 가능한 구조 시도)
@@ -346,7 +346,7 @@ class LawSearchRepository(BaseLawRepository):
                 "query": query,
                 "total": 0,
                 "law_names": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             # XML 응답에 에러 메시지가 있는지 확인
@@ -364,7 +364,7 @@ class LawSearchRepository(BaseLawRepository):
                         "page": page,
                         "per_page": per_page,
                         "query": query,
-                        "api_url": response.url,
+                        "api_url": str(response.url),
                         "recovery_guide": "API 서버에서 오류가 발생했습니다. 검색어를 확인하거나 잠시 후 다시 시도하세요."
                     }
 

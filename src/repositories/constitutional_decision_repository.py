@@ -79,7 +79,7 @@ class ConstitutionalDecisionRepository(BaseLawRepository):
                 return {
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "query": query,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                 }
 
@@ -89,7 +89,7 @@ class ConstitutionalDecisionRepository(BaseLawRepository):
                 "per_page": per_page,
                 "total": 0,
                 "decisions": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             if isinstance(data, dict):
@@ -165,14 +165,14 @@ class ConstitutionalDecisionRepository(BaseLawRepository):
                 return {
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "decision_id": decision_id,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                 }
 
             result = {
                 "decision_id": decision_id,
                 "decision": data,
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             search_cache[cache_key] = result

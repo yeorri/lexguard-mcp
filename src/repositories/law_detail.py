@@ -723,7 +723,7 @@ class LawDetailRepository(BaseLawRepository):
                     "law_name": law_name or "법령명 없음",
                     "articles": articles,
                     "article_count": len(articles),
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                 }
 
                 logger.debug(
@@ -740,7 +740,7 @@ class LawDetailRepository(BaseLawRepository):
                     "error": "JSON 파싱 실패",
                     "law_id": law_id,
                     "raw_response": response.text[:1000],
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요.",
                     "note": "API 응답 형식이 예상과 다를 수 있습니다.",
                 }
@@ -1198,7 +1198,7 @@ class LawDetailRepository(BaseLawRepository):
                     + (f" {ho}" if ho else "")
                     + (f" {mok}" if mok else ""),
                     "content": article_content or "조문 내용을 찾을 수 없습니다.",
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                 }
 
                 if fallback_mode and fallback_mode != "none":
@@ -1228,7 +1228,7 @@ class LawDetailRepository(BaseLawRepository):
                     "law_id": law_id,
                     "article_number": article_number,
                     "raw_response": response.text[:1000],
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                 }
 
         except httpx.TimeoutException:

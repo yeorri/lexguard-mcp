@@ -92,7 +92,7 @@ class CommitteeDecisionRepository(BaseLawRepository):
                     "error": "API가 빈 응답을 반환했습니다. API 키가 필요하거나 권한이 없을 수 있습니다.",
                     "committee_type": committee_type,
                     "query": query,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 키가 필요합니다. 사용자에게 API 키를 요청하거나, API 키를 환경변수(LAW_API_KEY)로 설정하세요.",
                     "note": "국가법령정보센터 OPEN API 사용을 위해서는 https://open.law.go.kr 에서 회원가입 및 API 활용 신청이 필요합니다."
                 }
@@ -109,7 +109,7 @@ class CommitteeDecisionRepository(BaseLawRepository):
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "committee_type": committee_type,
                     "query": query,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "raw_response": response.text[:200] if response.text else "Empty response",
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                 }
@@ -121,7 +121,7 @@ class CommitteeDecisionRepository(BaseLawRepository):
                 "per_page": per_page,
                 "total": 0,
                 "decisions": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             # JSON 구조 파싱
@@ -207,7 +207,7 @@ class CommitteeDecisionRepository(BaseLawRepository):
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "committee_type": committee_type,
                     "decision_id": decision_id,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                 }
 
@@ -215,7 +215,7 @@ class CommitteeDecisionRepository(BaseLawRepository):
                 "committee_type": committee_type,
                 "decision_id": decision_id,
                 "decision": data,
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             search_cache[cache_key] = result

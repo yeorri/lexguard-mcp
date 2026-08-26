@@ -172,7 +172,8 @@ def add_metadata(formatted: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         "law_article": "results.content에 조문 내용이 있습니다.",
         "law_history": "results.history 배열에 법령 연혁이 있습니다.",
         "law_info": "results.info 객체에 법령 기본 정보가 있습니다.",
-        "law_form": "results.forms 배열에 법령 서식 목록이 있습니다.",
+        # 실제 응답 키는 items다. forms로 안내하면 그대로 파싱했을 때 어긋난다.
+        "law_form": "results.items 배열에 법령 별표·서식 목록이 있습니다.",
         "law_link": "results.links 배열에 위임 관계 링크가 있습니다.",
         "clarification_needed": "results.possible_intents 배열에 가능한 의도 후보가 있습니다. results.suggestion을 참고하여 사용자에게 질문하세요."
     }

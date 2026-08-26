@@ -121,3 +121,27 @@ def test_초대형_응답은_여전히_제한된다():
     size = len(json.dumps(out, ensure_ascii=False).encode("utf-8"))
     assert size <= MAX_RESPONSE_SIZE
     assert len(out["structuredContent"]["articles"]) < len(items)
+
+
+def test_api_url은_문자열로_저장된다():
+    """httpx.URL이 그대로 들어가면 json.dumps가 TypeError를 낸다.
+
+    fetch가 'Object of type URL is not JSON serializable'로 실패하던 원인.
+    """
+    import pathlib
+    import re
+
+    leaked = []
+    for p in pathlib.Path("src").rglob("*.py"):
+        for m in re.finditer(r'"api_url":\s*(response|resp)\.url', p.read_text(encoding="utf-8")):
+            leaked.append(f"{p.as_posix()}: {m.group(0)}")
+    assert not leaked, "api_url에 URL 객체가 그대로 들어감:\n" + "\n".join(leaked)
+
+
+def test_직렬화_불가_타입도_응답이_깨지지_않는다():
+    """default=str 안전망이 걸려 있는지 확인."""
+    import httpx
+
+    payload = {"jsonrpc": "2.0", "id": 1, "result": {"api_url": httpx.URL("https://x.test/a?b=1")}}
+    out = json.dumps(payload, ensure_ascii=False, default=str)
+    assert "https://x.test/a?b=1" in out

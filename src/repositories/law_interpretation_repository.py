@@ -140,7 +140,7 @@ class LawInterpretationRepository(BaseLawRepository):
                 return {
                     "error": error_msg,
                     "query": query,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "raw_response": response.text[:500],
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                 }
@@ -152,7 +152,7 @@ class LawInterpretationRepository(BaseLawRepository):
                 "agency": agency,
                 "total": 0,
                 "interpretations": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             # JSON 구조 파싱
@@ -253,13 +253,13 @@ class LawInterpretationRepository(BaseLawRepository):
                 return {
                     "error": error_msg,
                     "interpretation_id": interpretation_id,
-                    "api_url": response.url
+                    "api_url": str(response.url)
                 }
 
             result = {
                 "interpretation_id": interpretation_id,
                 "interpretation": data,
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             search_cache[cache_key] = result

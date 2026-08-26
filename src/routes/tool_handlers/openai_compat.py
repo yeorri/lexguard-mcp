@@ -69,7 +69,10 @@ _TYPE_CONFIG = {
     "rule": {
         "list_key": "rules",
         "title_keys": ["행정규칙명"],
+        # 이름이 아니라 일련번호를 id로 실어야 fetch가 본문 API를 바로 호출할 수 있다
+        "id_keys": ["행정규칙일련번호"],
         "scheme": "rule",
+        "extra_keys": ["소관부처명", "발령번호"],
     },
 }
 
@@ -233,6 +236,40 @@ async def handle_fetch(arguments: dict, services: dict) -> dict:
     scheme = scheme.lower()
     url = f"{_LAW_GO_KR}/LSW/lsSc.do?menuId=1&query={quote(identifier.split('/', 1)[0])}"
 
+    # 행정규칙(고시·훈령·예규)은 전용 본문 API가 있다.
+    # 통합검색 화면을 긁으면 본문 대신 검색 페이지가 오므로 여기서 처리한다.
+    if scheme == "rule":
+        repo = services.get("admin_rule_repo")
+        if repo is not None:
+            ident = identifier.strip()
+            kwargs = {"rule_id": ident} if ident.isdigit() else {"rule_name": ident}
+            try:
+                res = await repo.get_administrative_rule(**kwargs, arguments=arguments)
+            except Exception as e:
+                logger.error("fetch rule error | id=%s error=%s", doc_id, e, exc_info=True)
+                res = {"error": str(e)}
+
+            if res.get("error"):
+                text = str(res["error"])
+            else:
+                header = " | ".join(
+                    str(v) for v in (
+                        res.get("rule_name"),
+                        f"{res.get('소관부처명') or ''} {res.get('발령번호') or ''}".strip(),
+                        f"시행 {res.get('시행일자') or ''}".strip(),
+                    ) if v and str(v).strip()
+                )
+                text = f"{header}\n\n{res.get('content') or ''}".strip()
+                if res.get("note"):
+                    text += f"\n\n[참고] {res['note']}"
+            return {
+                "id": doc_id,
+                "title": res.get("rule_name") or identifier,
+                "text": text or "본문을 찾을 수 없습니다.",
+                "url": url,
+                "metadata": {"scheme": scheme, "source": "국가법령정보센터", "rule_id": res.get("rule_id")},
+            }
+
     # read_resource가 지원하는 스킴 (law/case/interpret/appeal/lexguard)
     if scheme in ("law", "case", "interpret", "appeal", "lexguard"):
         from ..resource_handlers import read_resource
@@ -270,7 +307,11 @@ async def handle_fetch(arguments: dict, services: dict) -> dict:
             raw = await smart_search.smart_search(
                 identifier, search_types=[search_type], max_results_per_type=3, arguments=arguments
             )
-            text = json.dumps(raw.get("results") or {}, ensure_ascii=False, indent=1)
+            # default=str: httpx.URL 등 직렬화 불가 타입이 섞여 들어와도
+            # 전체 응답이 오류로 바뀌지 않도록 하는 안전망
+            text = json.dumps(
+                raw.get("results") or {}, ensure_ascii=False, indent=1, default=str
+            )
         except Exception as e:
             logger.error("fetch fallback error | id=%s error=%s", doc_id, e, exc_info=True)
             text = f"조회 중 오류가 발생했습니다: {e}"

@@ -39,6 +39,7 @@ from .repositories.precedent_repository import PrecedentRepository  # noqa: E402
 from .repositories.law_interpretation_repository import LawInterpretationRepository  # noqa: E402
 from .repositories.administrative_appeal_repository import AdministrativeAppealRepository  # noqa: E402
 from .repositories.legal_term_repository import LegalTermRepository  # noqa: E402
+from .repositories.administrative_rule_repository import AdministrativeRuleRepository  # noqa: E402
 from .routes.mcp_routes import _build_prompts_list, _get_prompt  # noqa: E402
 from .routes.resource_handlers import build_resources_list, read_resource  # noqa: E402
 from .routes.tool_handlers import dispatch  # noqa: E402
@@ -60,6 +61,7 @@ _precedent_repo = PrecedentRepository()
 _interpretation_repo = LawInterpretationRepository()
 _appeal_repo = AdministrativeAppealRepository()
 _legal_term_repo = LegalTermRepository()
+_admin_rule_repo = AdministrativeRuleRepository()
 
 _SERVICES = {
     "health": _health_service,
@@ -71,6 +73,7 @@ _SERVICES = {
     "interpretation_repo": _interpretation_repo,
     "appeal_repo": _appeal_repo,
     "legal_term_repo": _legal_term_repo,
+    "admin_rule_repo": _admin_rule_repo,
 }
 
 
@@ -120,7 +123,7 @@ async def _call_tool(tool_name: str, arguments: dict) -> dict:
     if tool_name in ("search", "fetch"):
         # ChatGPT 커넥터 규격: content에 JSON 문자열 하나만
         formatted = {
-            "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]
+            "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, default=str)}]
         }
     else:
         formatted = format_mcp_response(result, tool_name)
@@ -202,7 +205,9 @@ async def handle_message(message: dict) -> dict | None:
 
 
 def _write(response: dict) -> None:
-    _STDOUT.write(json.dumps(response, ensure_ascii=False) + "\n")
+    # default=str: httpx.URL 등 직렬화 불가 타입이 섞여도 응답 전체가
+    # 깨지지 않도록 하는 마지막 안전망
+    _STDOUT.write(json.dumps(response, ensure_ascii=False, default=str) + "\n")
     _STDOUT.flush()
 
 

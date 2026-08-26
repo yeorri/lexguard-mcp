@@ -81,7 +81,7 @@ class SpecialAdministrativeAppealRepository(BaseLawRepository):
                     "error": "API가 빈 응답을 반환했습니다. API 키가 필요하거나 권한이 없을 수 있습니다.",
                     "tribunal_type": tribunal_type,
                     "query": query,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "note": "국가법령정보센터 OPEN API 사용을 위해서는 https://open.law.go.kr 에서 회원가입 및 API 활용 신청이 필요합니다."
                 }
 
@@ -97,7 +97,7 @@ class SpecialAdministrativeAppealRepository(BaseLawRepository):
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "tribunal_type": tribunal_type,
                     "query": query,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요.",
                     "raw_response": response.text[:200] if response.text else "Empty response"
                 }
@@ -109,7 +109,7 @@ class SpecialAdministrativeAppealRepository(BaseLawRepository):
                 "per_page": per_page,
                 "total": 0,
                 "appeals": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             if isinstance(data, dict):
@@ -218,14 +218,14 @@ class SpecialAdministrativeAppealRepository(BaseLawRepository):
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "tribunal_type": tribunal_type,
                     "appeal_id": appeal_id,
-                    "api_url": response.url
+                    "api_url": str(response.url)
                 }
 
             result = {
                 "tribunal_type": tribunal_type,
                 "appeal_id": appeal_id,
                 "appeal": data,
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             search_cache[cache_key] = result

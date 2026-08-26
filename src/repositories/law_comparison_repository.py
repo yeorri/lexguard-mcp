@@ -151,7 +151,7 @@ class LawComparisonRepository(BaseLawRepository):
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "law_name": law_name,
                     "compare_type": compare_type,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                 }
 
@@ -160,7 +160,7 @@ class LawComparisonRepository(BaseLawRepository):
                 "law_id": law_id,
                 "compare_type": compare_type,
                 "comparison": data,
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             search_cache[cache_key] = result

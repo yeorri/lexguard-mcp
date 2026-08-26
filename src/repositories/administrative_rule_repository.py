@@ -84,7 +84,7 @@ class AdministrativeRuleRepository(BaseLawRepository):
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "query": query,
                     "agency": agency,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                 }
 
@@ -95,7 +95,7 @@ class AdministrativeRuleRepository(BaseLawRepository):
                 "per_page": per_page,
                 "total": 0,
                 "rules": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             if isinstance(data, dict):
@@ -131,6 +131,111 @@ class AdministrativeRuleRepository(BaseLawRepository):
                 "error": f"예상치 못한 오류: {str(e)}",
                 "recovery_guide": "시스템 오류가 발생했습니다. 서버 로그를 확인하거나 관리자에게 문의하세요."
             }
+
+    async def get_administrative_rule(
+        self,
+        rule_id: Optional[str] = None,
+        rule_name: Optional[str] = None,
+        arguments: Optional[dict] = None,
+    ) -> dict:
+        """행정규칙 본문을 조회한다 (lawService.do, target=admrul).
+
+        rule_id(행정규칙일련번호)가 있으면 ID로, 없으면 이름으로 먼저 검색해
+        일련번호를 찾은 뒤 조회한다. 목록 API만으로는 조문 전문을 얻을 수 없다.
+        """
+        if not rule_id and not rule_name:
+            return {
+                "error": "rule_id 또는 rule_name 중 하나가 필요합니다.",
+                "recovery_guide": "administrative_rule_tool로 먼저 검색해 행정규칙일련번호를 확인하세요.",
+            }
+
+        # 이름만 있으면 검색으로 일련번호를 찾는다
+        if not rule_id:
+            found = await self.search_administrative_rule(rule_name, None, 1, 5, arguments)
+            if found.get("error"):
+                return found
+            for item in found.get("rules") or []:
+                if isinstance(item, dict) and item.get("행정규칙일련번호"):
+                    rule_id = str(item["행정규칙일련번호"])
+                    rule_name = item.get("행정규칙명") or rule_name
+                    break
+            if not rule_id:
+                return {
+                    "error": f"'{rule_name}'에 해당하는 행정규칙을 찾지 못했습니다.",
+                    "recovery_guide": "행정규칙명을 확인하거나 administrative_rule_tool로 먼저 검색하세요.",
+                }
+
+        cache_key = ("admrul_detail", str(rule_id))
+        if cache_key in search_cache:
+            return search_cache[cache_key]
+        if cache_key in failure_cache:
+            return failure_cache[cache_key]
+
+        try:
+            params = {"target": "admrul", "type": "JSON", "ID": str(rule_id)}
+            _, api_key_error = self.attach_api_key(params, arguments, LAW_API_BASE_URL)
+            if api_key_error:
+                return api_key_error
+
+            response = await aget(LAW_API_BASE_URL, params=params, timeout=DRF_REQUEST_TIMEOUT_SEC)
+            invalid = self.validate_drf_response(response)
+            if invalid:
+                failure_cache[cache_key] = invalid
+                return invalid
+            response.raise_for_status()
+
+            try:
+                data = response.json()
+            except json.JSONDecodeError as e:
+                return {
+                    "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {e}",
+                    "rule_id": rule_id,
+                    "api_url": str(response.url),
+                }
+
+            body = data.get("AdmRulService") if isinstance(data, dict) else None
+            if not isinstance(body, dict):
+                body = data if isinstance(data, dict) else {}
+
+            info = body.get("행정규칙기본정보") or {}
+            articles = body.get("조문내용") or []
+            if isinstance(articles, str):
+                articles = [articles]
+            elif not isinstance(articles, list):
+                articles = []
+
+            result = {
+                "rule_id": str(rule_id),
+                "rule_name": (info.get("행정규칙명") if isinstance(info, dict) else None) or rule_name,
+                "발령번호": info.get("발령번호") if isinstance(info, dict) else None,
+                "발령일자": info.get("발령일자") if isinstance(info, dict) else None,
+                "시행일자": info.get("시행일자") if isinstance(info, dict) else None,
+                "소관부처명": info.get("소관부처명") if isinstance(info, dict) else None,
+                "조문수": len(articles),
+                "content": "\n\n".join(str(a) for a in articles),
+                "부칙": body.get("부칙"),
+                "api_url": str(response.url),
+            }
+            if not articles:
+                result["message"] = "조문 내용을 찾을 수 없습니다."
+                result["note"] = "일부 고시는 본문이 첨부파일(별표·서식)로만 제공됩니다."
+
+            search_cache[cache_key] = result
+            return result
+
+        except httpx.TimeoutException:
+            err = {
+                "error_code": "API_ERROR_TIMEOUT",
+                "error": "API 호출 타임아웃",
+                "recovery_guide": "잠시 후 다시 시도하세요.",
+            }
+            failure_cache[cache_key] = err
+            return err
+        except httpx.RequestError as e:
+            return {"error": f"API 요청 실패: {e}"}
+        except Exception as e:
+            logger.exception("행정규칙 본문 조회 오류 | rule_id=%s", rule_id)
+            return {"error": f"예상치 못한 오류: {e}"}
 
     async def search_admin_rule_comparison(
         self,

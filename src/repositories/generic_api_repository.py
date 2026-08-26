@@ -119,7 +119,7 @@ class GenericAPIRepository(BaseLawRepository):
                         "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                         "api_name": api_name,
                         "api_id": api_id,
-                        "api_url": response.url,
+                        "api_url": str(response.url),
                         "raw_response": response.text[:500],
                         "recovery_guide": "API 응답 형식 오류입니다. API 서버 상태를 확인하거나 잠시 후 다시 시도하세요."
                     }

@@ -110,7 +110,7 @@ class PrecedentRepository(BaseLawRepository):
                 return {
                     "error": error_msg,
                     "query": query,
-                    "api_url": response.url,
+                    "api_url": str(response.url),
                     "raw_response": response.text[:500]
                 }
 
@@ -120,7 +120,7 @@ class PrecedentRepository(BaseLawRepository):
                 "per_page": per_page,
                 "total": 0,
                 "precedents": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             # JSON 구조 파싱
@@ -246,7 +246,7 @@ class PrecedentRepository(BaseLawRepository):
                 return {
                     "error": f"API 응답이 유효한 JSON 형식이 아닙니다: {str(e)}",
                     "query": query,
-                    "api_url": response.url
+                    "api_url": str(response.url)
                 }
 
             result = {
@@ -255,7 +255,7 @@ class PrecedentRepository(BaseLawRepository):
                 "per_page": per_page,
                 "total": 0,
                 "precedents": [],
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             # JSON 구조 파싱
@@ -759,13 +759,13 @@ class PrecedentRepository(BaseLawRepository):
                 return {
                     "error": error_msg,
                     "precedent_id": precedent_id,
-                    "api_url": response.url
+                    "api_url": str(response.url)
                 }
 
             result = {
                 "precedent_id": precedent_id,
                 "precedent": data,
-                "api_url": response.url
+                "api_url": str(response.url)
             }
 
             search_cache[cache_key] = result
