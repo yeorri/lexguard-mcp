@@ -4,6 +4,7 @@ Law Detail Repository - 법령 조회 기능
 
 import httpx
 from ..utils.http_client import aget
+from ..utils.amendment import extract_amendment_dates
 import json
 from typing import Any, Optional
 from datetime import datetime
@@ -1200,6 +1201,15 @@ class LawDetailRepository(BaseLawRepository):
                     "content": article_content or "조문 내용을 찾을 수 없습니다.",
                     "api_url": str(response.url),
                 }
+
+                # 조문 본문에 붙는 <개정 …> / 삭제 <…> 표기에서 개정 시점을 뽑는다.
+                # 개정이력 API(lsHstInf·lsJoHstInf)는 이 키로 항상 0건이라
+                # 특정 문언이 언제 바뀌었는지 확인할 유일한 경로다.
+                revisions, deletions = extract_amendment_dates(article_content)
+                if revisions:
+                    result["개정일자"] = revisions
+                if deletions:
+                    result["삭제일자"] = deletions
 
                 if fallback_mode and fallback_mode != "none":
                     result["fallback"] = {

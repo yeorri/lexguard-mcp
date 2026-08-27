@@ -108,7 +108,15 @@ class LawHistoryRepository(BaseLawRepository):
                 "api_url": str(response.url),
             }
             if not items:
+                # 이 인증키로는 이력 계열 API(lsHstInf·lsJoHstInf)가 파라미터와
+                # 무관하게 항상 0건을 반환한다(인증 오류가 아니라 정상 응답).
+                # 조회가 막힌 것인지 자료가 없는 것인지 호출자가 구분할 수 있게 안내한다.
                 result["message"] = "검색 결과가 없습니다."
+                result["note"] = (
+                    "개정이력 API는 현재 인증키로 데이터가 제공되지 않습니다"
+                    "(파라미터와 무관하게 0건). 개정·삭제 시점은 law_article_tool로"
+                    " 조문을 조회하면 응답의 개정일자·삭제일자 필드에서 확인할 수 있습니다."
+                )
             search_cache[cache_key] = result
             return result
 
@@ -207,7 +215,15 @@ class LawHistoryRepository(BaseLawRepository):
                 "api_url": str(response.url),
             }
             if not items:
+                # 이 인증키로는 이력 계열 API(lsHstInf·lsJoHstInf)가 파라미터와
+                # 무관하게 항상 0건을 반환한다(인증 오류가 아니라 정상 응답).
+                # 조회가 막힌 것인지 자료가 없는 것인지 호출자가 구분할 수 있게 안내한다.
                 result["message"] = "검색 결과가 없습니다."
+                result["note"] = (
+                    "개정이력 API는 현재 인증키로 데이터가 제공되지 않습니다"
+                    "(파라미터와 무관하게 0건). 개정·삭제 시점은 law_article_tool로"
+                    " 조문을 조회하면 응답의 개정일자·삭제일자 필드에서 확인할 수 있습니다."
+                )
             search_cache[cache_key] = result
             return result
 

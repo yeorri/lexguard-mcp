@@ -591,6 +591,10 @@ def format_search_response(result: Dict[str, Any], tool_name: str) -> Dict[str, 
             "mok": result.get("mok"),
             "title": result.get("title"),
             "content": result.get("content"),
+            # 개정이력 API가 이 인증키로는 항상 0건이라, 조문 본문의
+            # <개정 …>·삭제 <…> 표기에서 뽑은 시점이 유일한 확인 경로다.
+            "개정일자": result.get("개정일자"),
+            "삭제일자": result.get("삭제일자"),
             "fallback": result.get("fallback"),
             "note": result.get("note"),
             "api_url": result.get("api_url"),
