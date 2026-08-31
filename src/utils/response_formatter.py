@@ -8,7 +8,6 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-from .document_issue_prompts import get_document_issue_review_instruction
 
 
 def mask_oc_in_url(url: Any) -> Any:
@@ -633,38 +632,10 @@ def format_mcp_response(result: Dict[str, Any], tool_name: str) -> Dict[str, Any
 
     contents = []
 
-    # A 타입 형식 리마인더 추가 (legal_qa_tool, document_issue_tool에만)
-    if tool_name in ["legal_qa_tool", "document_issue_tool"]:
-        if tool_name == "legal_qa_tool":
-            template_reminder = """답변 형식 (A 타입, 아래 구조를 정확히 따르세요):
-
-[한 줄 방향 제시] + [두 번째 문장: 쟁점 설명]
-(예: 근로자로 인정될 가능성이 있는 사안입니다. 프리랜서 계약서 작성이나 4대보험 미가입만으로 근로자성이 자동으로 부정되지는 않으며, 실제 업무 방식이 핵심 쟁점이 될 수 있습니다.)
-
-특히 다음과 같은 점들이 중요하게 판단됩니다:
-- [체크포인트 1 + 구체적 예시를 괄호로] (예: 업무 수행 과정에서 플랫폼/업체의 구체적인 지휘·감독이 있었는지(배차·평가·패널티 등))
-- [체크포인트 2 + 구체적 예시를 괄호로]
-- [체크포인트 3 + 구체적 예시를 괄호로]
-
-관련해서는 [법령명]상 [어떤 기준]과, [어떤 상황]에서 [무엇]을 본 판례·행정 해석이 참고될 수 있습니다.
-(예: 근로기준법상 근로자성 판단 기준과, 플랫폼 종사자/특수고용 형태에서 실질적 종속관계를 본 판례·행정 해석이 참고될 수 있습니다.)
-
-본 답변은 법적 판단을 대신하지 않으며, 구체적인 사실관계에 따라 결론은 달라질 수 있습니다.
-
-[구체적인 추가 정보 3-5가지를 나열] 알려주시면 보다 정확한 검토에 도움이 됩니다.
-(예: 배달 플랫폼(또는 업체)과의 관계가 어떤 형태인지(직접 고용인지/도급인지), 배차·평가·패널티가 있었는지, 수입이 어떻게 정산됐는지 알려주시면...)
-
-필수: 체크리스트는 반드시 하이픈(-)으로 시작, 괄호로 구체적 예시 추가
-금지: 이모지, 타이틀, 조문 전체 인용, 단정적 결론, "추가 정보가 필요합니다" 같은 막연한 표현"""
-        else:  # document_issue_tool
-            # structuredContent에 document_type_code가 있으면 근로·용역 문서에 고밀도(B) 지시
-            dtc = formatted.get("document_type_code")
-            template_reminder = get_document_issue_review_instruction(dtc)
-
-        contents.append({
-            "type": "text",
-            "text": template_reminder
-        })
+    # 답변 형식 지시는 넣지 않는다.
+    # 조회 결과를 어떻게 정리해 답할지는 대화 세션이 판단할 몫이고,
+    # 서버가 템플릿을 주입하면 사용자가 원하는 형태(예: 조문 전문 인용)를
+    # 도구가 막아버리게 된다.
 
     if tool_name == "document_issue_tool":
         auto_search = formatted.get("auto_search")
