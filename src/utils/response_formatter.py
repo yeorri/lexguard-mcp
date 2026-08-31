@@ -589,7 +589,12 @@ def format_search_response(result: Dict[str, Any], tool_name: str) -> Dict[str, 
             "ho": result.get("ho"),
             "mok": result.get("mok"),
             "title": result.get("title"),
-            "content": result.get("content"),
+            # 조문은 원문(조문단위)만 전달한다.
+            # 조립 텍스트(content)를 함께 주면 같은 내용이 두 벌로 실려
+            # 토큰이 두 배가 되고, 둘 중 어느 쪽이 맞는지 대조하는 일까지
+            # 받는 쪽 몫이 된다. 조립은 텍스트가 계약인 fetch·resources에서만 쓴다.
+            # 원문을 못 얻은 경로(일부 폴백)에서만 조립본을 대신 싣는다.
+            "content": None if result.get("원문") else result.get("content"),
             # 개정이력 API가 이 인증키로는 항상 0건이라, 조문 본문의
             # <개정 …>·삭제 <…> 표기에서 뽑은 시점이 유일한 확인 경로다.
             "개정일자": result.get("개정일자"),
