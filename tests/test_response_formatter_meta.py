@@ -11,6 +11,18 @@ response_formatter.add_metadata — _meta.fields/response_type/parsing_hint 정�
 from src.utils.response_formatter import add_metadata, format_mcp_response
 
 
+def _payload(mcp_response):
+    """MCP 응답 본문을 파싱한다.
+
+    structuredContent는 content[0].text와 같은 데이터를 한 벌 더 실어
+    응답을 두 배로 만들기 때문에 제거했다. 본문은 content에서 읽는다.
+    """
+    import json as _json
+
+    return _json.loads(mcp_response["content"][0]["text"])
+
+
+
 # ---------------------------------------------------------------------------
 # response_type_map — 현재 MCP tool 이름 등록
 # ---------------------------------------------------------------------------
@@ -129,7 +141,7 @@ def test_legal_basis_block_pinned_to_top_of_fields():
 
 
 def test_format_mcp_response_preserves_error_code_for_local_ordinance():
-    """repository의 INVALID_INPUT이 MCP structuredContent까지 보존되어야 한다."""
+    """repository의 INVALID_INPUT이 MCP 응답 본문까지 보존되어야 한다."""
     result = {
         "error_code": "INVALID_INPUT",
         "error": "지원하지 않는 지자체 명칭입니다: '없는지역'",
@@ -139,10 +151,10 @@ def test_format_mcp_response_preserves_error_code_for_local_ordinance():
     response = format_mcp_response(result, "local_ordinance_tool")
 
     assert response["isError"] is True
-    assert response["structuredContent"]["success"] is False
-    assert response["structuredContent"]["error_code"] == "INVALID_INPUT"
-    assert response["structuredContent"]["_meta"]["response_type"] == "ordinance_list"
-    assert response["structuredContent"]["_meta"]["fields"] == ["error", "recovery_guide"]
+    assert _payload(response)["success"] is False
+    assert _payload(response)["error_code"] == "INVALID_INPUT"
+    assert _payload(response)["_meta"]["response_type"] == "ordinance_list"
+    assert _payload(response)["_meta"]["fields"] == ["error", "recovery_guide"]
 
 
 def test_format_mcp_response_preserves_error_code_for_law_article():
@@ -156,5 +168,5 @@ def test_format_mcp_response_preserves_error_code_for_law_article():
     response = format_mcp_response(result, "law_article_tool")
 
     assert response["isError"] is True
-    assert response["structuredContent"]["error_code"] == "NOT_FOUND"
-    assert response["structuredContent"]["_meta"]["response_type"] == "law_article"
+    assert _payload(response)["error_code"] == "NOT_FOUND"
+    assert _payload(response)["_meta"]["response_type"] == "law_article"

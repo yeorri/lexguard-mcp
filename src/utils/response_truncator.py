@@ -273,6 +273,47 @@ def _reduce_structured_content(structured: Dict[str, Any]) -> Dict[str, Any]:
     return reduced
 
 
+def _shrink_content_only(result: Dict[str, Any], max_bytes: int) -> Dict[str, Any]:
+    """content[0].text에 담긴 JSON을 줄여 전체 크기를 맞춘다.
+
+    structuredContent를 두지 않는 응답용. 텍스트가 JSON이 아니면
+    (설명문 등) 마지막 수단으로 문자열을 자른다.
+    """
+    blocks = result.get("content")
+    if not isinstance(blocks, list) or not blocks:
+        return result
+
+    target = None
+    for block in blocks:
+        if isinstance(block, dict) and isinstance(block.get("text"), str):
+            target = block
+    if target is None:
+        return result
+
+    try:
+        payload = json.loads(target["text"])
+    except (json.JSONDecodeError, TypeError):
+        text = target["text"]
+        if len(text.encode("utf-8")) > max_bytes:
+            target["text"] = text[:FIELD_TRUNCATE_KEEP] + "... [truncated]"
+        return result
+
+    if not isinstance(payload, dict):
+        return result
+
+    for _ in range(4):
+        payload = aggressive_truncate(payload, max_bytes)
+        target["text"] = json.dumps(payload, ensure_ascii=False)
+        if get_response_size(result) <= max_bytes:
+            return result
+        payload = _reduce_structured_content(payload)
+        target["text"] = json.dumps(payload, ensure_ascii=False)
+        if get_response_size(result) <= max_bytes:
+            return result
+
+    return result
+
+
 def shrink_response_bytes(result: Dict[str, Any], max_bytes: int = MAX_RESPONSE_SIZE) -> Dict[str, Any]:
     """
     최종 JSON 직렬화 기준으로 바이트 크기를 하드 제한합니다.
@@ -285,6 +326,11 @@ def shrink_response_bytes(result: Dict[str, Any], max_bytes: int = MAX_RESPONSE_
         return result
 
     truncated = result.copy() if isinstance(result, dict) else result
+
+    # structuredContent 없이 content만 있는 응답(조문 조회·search·fetch)은
+    # content[0].text 안의 JSON을 직접 줄인다.
+    if isinstance(truncated, dict) and "structuredContent" not in truncated:
+        return _shrink_content_only(truncated, max_bytes)
 
     for _ in range(4):
         if isinstance(truncated, dict) and isinstance(truncated.get("structuredContent"), dict):

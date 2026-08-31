@@ -99,7 +99,6 @@ def _mcp_tools() -> list:
             "name": tool.get("name"),
             "description": tool.get("description"),
             "inputSchema": tool.get("inputSchema"),
-            "outputSchema": tool.get("outputSchema"),
         }
         filtered = {k: v for k, v in filtered.items() if v is not None}
         if annotations:

@@ -667,9 +667,11 @@ def format_mcp_response(result: Dict[str, Any], tool_name: str) -> Dict[str, Any
     # 에러 여부 확인
     is_error = not formatted.get("success", True) or "error" in formatted
 
+    # structuredContent는 두지 않는다.
+    # content[0].text와 완전히 같은 데이터라 응답이 두 배가 되는데,
+    # 조회 도구가 원문을 그대로 넘기는 지금은 구조화 사본을 둘 이유가 없다.
     return {
         "content": contents,
-        "structuredContent": formatted,
         "isError": is_error
     }
 

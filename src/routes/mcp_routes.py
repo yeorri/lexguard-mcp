@@ -222,7 +222,6 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
                             "name": tool.get("name"),
                             "description": tool.get("description"),
                             "inputSchema": tool.get("inputSchema"),
-                            "outputSchema": tool.get("outputSchema")
                         }
                         filtered = {k: v for k, v in filtered.items() if v is not None}
                         if annotations:
