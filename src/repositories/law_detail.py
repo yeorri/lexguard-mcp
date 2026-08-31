@@ -135,8 +135,19 @@ class LawDetailRepository(BaseLawRepository):
             article_item.get("항") or article_item.get("paragraphs")
         )
 
-        parts = [str(title).strip()] if title else []
+        parts: list[str] = [str(title).strip()] if title else []
         body_text = str(article_body).strip() if article_body else ""
+
+        # 조립 규칙으로 "무엇을 쓸지" 고르면 이번 제53조 두문처럼 조용히
+        # 빠지는 텍스트가 생긴다. 마지막에 남은 텍스트 필드를 훑어
+        # 아직 안 담긴 것을 덧붙여, 누락이 구조적으로 생기지 않게 한다.
+        def append_missing(extra: str) -> None:
+            text = str(extra).strip()
+            if not text or text.lower() == "none":
+                return
+            if any(text in p for p in parts):
+                return
+            parts.append(text)
 
         if hang_items:
             # 항이 있어도 조문내용에 두문(각 호 외의 부분)이 담겨 있을 수 있다.
@@ -153,7 +164,21 @@ class LawDetailRepository(BaseLawRepository):
             if body_text and body_text not in parts:
                 parts.append(body_text)
 
+        # 안전망: 위 규칙이 못 담은 텍스트 필드를 마지막에 이어붙인다.
+        # 식별자·플래그성 필드는 본문이 아니므로 제외한다.
+        for key, value in article_item.items():
+            if key in cls._NON_TEXT_ARTICLE_KEYS or not isinstance(value, str):
+                continue
+            append_missing(cls._extract_chapeau(value) if key == "조문내용" else value)
+
         return "\n".join(part for part in parts if part)
+
+    # 본문이 아닌 식별자·플래그 필드 (조립 안전망에서 제외)
+    _NON_TEXT_ARTICLE_KEYS = frozenset({
+        "조문번호", "조문가지번호", "조문키", "조문여부", "조문변경여부",
+        "조문이동이전", "조문이동이후", "조문시행일자", "조문제개정유형",
+        "조문제개정일자문자열", "articleNumber", "articleKey",
+    })
 
     # "제53조(증여재산 공제)" 처럼 앞에 붙는 조 표시. 이 부분만 남으면 제목일 뿐이다.
     _ARTICLE_HEADING = re.compile(r"^\s*제\s*\d+\s*조(?:\s*의\s*\d+)?\s*(?:\([^)]*\))?\s*")
@@ -1232,6 +1257,23 @@ class LawDetailRepository(BaseLawRepository):
                 # 조문 본문에 붙는 <개정 …> / 삭제 <…> 표기에서 개정 시점을 뽑는다.
                 # 개정이력 API(lsHstInf·lsJoHstInf)는 이 키로 항상 0건이라
                 # 특정 문언이 언제 바뀌었는지 확인할 유일한 경로다.
+                # 응답에 구조화된 메타가 함께 오면 본문 파싱보다 정확하다.
+                # (조문시행일자·조문제개정일자문자열·조문참고자료)
+                source_unit = None
+                for cand in (locals().get("matched_article"), locals().get("josub_unit")):
+                    if isinstance(cand, dict):
+                        source_unit = cand
+                        break
+                if source_unit:
+                    for key, out in (
+                        ("조문시행일자", "조문시행일자"),
+                        ("조문제개정일자문자열", "제개정일자"),
+                        ("조문참고자료", "참고자료"),
+                    ):
+                        value = source_unit.get(key)
+                        if isinstance(value, str) and value.strip():
+                            result[out] = value.strip()
+
                 revisions, deletions = extract_amendment_dates(article_content)
                 if revisions:
                     result["개정일자"] = revisions
