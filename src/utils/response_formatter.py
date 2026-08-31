@@ -168,7 +168,7 @@ def add_metadata(formatted: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         "integrated_search": "results.results 객체에 검색 타입별 결과가 있습니다. results.detected_intents로 감지된 의도를 확인하세요.",
         "situation_guidance": "results.guidance 배열에 단계별 가이드가 있습니다. results.laws, results.precedents, results.interpretations에 관련 법적 정보가 있습니다.",
         "document_issue": "results.document_analysis에 조항별 이슈와 근거 조회 힌트가 있습니다.",
-        "law_article": "results.content에 조문 내용이 있습니다.",
+        "law_article": "results.원문에 조문단위 원본(조문내용=두문, 항·호·목)이 그대로 있습니다. 개정 시점은 results.개정일자·삭제일자를 보세요.",
         "law_history": "results.history 배열에 법령 연혁이 있습니다.",
         "law_info": "results.info 객체에 법령 기본 정보가 있습니다.",
         # 실제 응답 키는 items다. forms로 안내하면 그대로 파싱했을 때 어긋난다.
