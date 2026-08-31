@@ -2,6 +2,8 @@
 Law Detail Repository - 법령 조회 기능
 """
 
+import re
+
 import httpx
 from ..utils.http_client import aget
 from ..utils.amendment import extract_amendment_dates
@@ -134,14 +136,39 @@ class LawDetailRepository(BaseLawRepository):
         )
 
         parts = [str(title).strip()] if title else []
+        body_text = str(article_body).strip() if article_body else ""
+
         if hang_items:
+            # 항이 있어도 조문내용에 두문(각 호 외의 부분)이 담겨 있을 수 있다.
+            # 상증법 제53조가 그런 경우로, 조문내용에 "…공제한다. 이 경우 그
+            # 증여세 과세가액에서 공제받을 금액과 …10년 이내에 공제받은 금액을
+            # 합한 금액이 …" 하는 한도 규정이 들어 있다.
+            # 예전에는 항이 있으면 조문내용을 통째로 버려서 각 호만 남았고,
+            # 한도·요건이 사라진 채로 인용될 위험이 있었다.
+            chapeau = cls._extract_chapeau(body_text)
+            if chapeau and chapeau not in parts:
+                parts.append(chapeau)
             parts.extend(cls._render_hang_text(hang_item) for hang_item in hang_items)
         else:
-            body_text = str(article_body).strip() if article_body else ""
             if body_text and body_text not in parts:
                 parts.append(body_text)
 
         return "\n".join(part for part in parts if part)
+
+    # "제53조(증여재산 공제)" 처럼 앞에 붙는 조 표시. 이 부분만 남으면 제목일 뿐이다.
+    _ARTICLE_HEADING = re.compile(r"^\s*제\s*\d+\s*조(?:\s*의\s*\d+)?\s*(?:\([^)]*\))?\s*")
+
+    @classmethod
+    def _extract_chapeau(cls, body_text: str) -> str:
+        """조문내용에서 조 표시를 걷어내고 두문만 남긴다.
+
+        제목만 있는 경우(예: '제95조(양도소득금액과 장기보유 특별공제액)')는
+        빈 문자열을 반환해 중복 출력하지 않는다.
+        """
+        if not body_text:
+            return ""
+        remainder = cls._ARTICLE_HEADING.sub("", body_text, count=1).strip()
+        return remainder
 
     @staticmethod
     def _find_article_unit(
