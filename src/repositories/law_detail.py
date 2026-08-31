@@ -1274,6 +1274,12 @@ class LawDetailRepository(BaseLawRepository):
                         if isinstance(value, str) and value.strip():
                             result[out] = value.strip()
 
+                    # 조립(content)은 편의를 위한 것이고, 조문 구조는 예외가 많아
+                    # 렌더링이 틀리면 답이 통째로 틀어진다. 그래서 매칭된
+                    # 조문단위 원본을 함께 실어 대조할 수 있게 한다.
+                    # (조문 하나 분량이라 크기 부담은 1~2천 자 수준)
+                    result["원문"] = source_unit
+
                 revisions, deletions = extract_amendment_dates(article_content)
                 if revisions:
                     result["개정일자"] = revisions

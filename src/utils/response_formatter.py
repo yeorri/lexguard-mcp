@@ -598,6 +598,8 @@ def format_search_response(result: Dict[str, Any], tool_name: str) -> Dict[str, 
             "조문시행일자": result.get("조문시행일자"),
             "제개정일자": result.get("제개정일자"),
             "참고자료": result.get("참고자료"),
+            # 조립 결과가 틀렸을 때 대조할 수 있도록 조문단위 원본을 함께 준다
+            "원문": result.get("원문"),
             "fallback": result.get("fallback"),
             "note": result.get("note"),
             "api_url": result.get("api_url"),
