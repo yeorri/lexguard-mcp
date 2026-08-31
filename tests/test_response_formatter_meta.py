@@ -170,3 +170,30 @@ def test_format_mcp_response_preserves_error_code_for_law_article():
     assert response["isError"] is True
     assert _payload(response)["error_code"] == "NOT_FOUND"
     assert _payload(response)["_meta"]["response_type"] == "law_article"
+
+
+def test_값이_없는_필드는_응답에_싣지_않는다():
+    """툴마다 고정 필드 목록으로 응답을 만들다 보니 해당 없는 항목이
+    null로 남았다. 조문 조회에서만 content·개정일자·참고자료 등 7개였다."""
+    from src.utils.response_formatter import format_mcp_response
+
+    result = {
+        "law_id": "280405",
+        "article_number": "94",
+        "title": "양도소득의 범위",
+        "원문": {"조문번호": "94"},
+        # 아래는 값이 없는 항목 — 응답에서 빠져야 한다
+        "content": None,
+        "개정일자": None,
+        "삭제일자": None,
+        "참고자료": None,
+        "note": None,
+    }
+    body = _payload(format_mcp_response(result, "law_article_tool"))
+
+    assert [k for k, v in body.items() if v is None] == []
+    for dropped in ("content", "개정일자", "삭제일자", "참고자료", "note"):
+        assert dropped not in body
+    # 값이 있는 항목은 그대로 남는다
+    assert body["title"] == "양도소득의 범위"
+    assert body["원문"]["조문번호"] == "94"

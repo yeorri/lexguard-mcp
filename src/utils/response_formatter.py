@@ -627,6 +627,13 @@ def format_mcp_response(result: Dict[str, Any], tool_name: str) -> Dict[str, Any
     # 구조화된 응답 생성
     formatted = format_search_response(result, tool_name)
 
+    # 값이 없는 필드는 아예 싣지 않는다.
+    # 툴마다 고정 필드 목록으로 응답을 만들다 보니 해당 없는 항목이
+    # null로 잔뜩 남는다(조문 조회에서 content·개정일자·참고자료 등 7개).
+    # 읽는 쪽에는 의미 없는 잡음이고 토큰만 쓴다.
+    if isinstance(formatted, dict):
+        formatted = {k: v for k, v in formatted.items() if v is not None}
+
     # 메타데이터 추가 (Phase 3 개선)
     formatted = add_metadata(formatted, tool_name)
 
