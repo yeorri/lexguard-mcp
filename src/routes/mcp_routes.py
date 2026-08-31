@@ -56,6 +56,8 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
     _legal_term_repo = LegalTermRepository()
     from ..repositories.administrative_rule_repository import AdministrativeRuleRepository
     _admin_rule_repo = AdministrativeRuleRepository()
+    from ..repositories.law_history_repository import LawHistoryRepository
+    _law_history_repo = LawHistoryRepository()
 
     # 모든 요청 로깅 미들웨어 (디버깅용) - Health Check 요청 제외
     @api.middleware("http")
@@ -352,6 +354,7 @@ def register_mcp_routes(api: FastAPI, law_service: LawService, health_service: H
                         "appeal_repo": _appeal_repo,
                         "legal_term_repo": _legal_term_repo,
                         "admin_rule_repo": _admin_rule_repo,
+                        "law_history_repo": _law_history_repo,
                     }
 
                     result = None

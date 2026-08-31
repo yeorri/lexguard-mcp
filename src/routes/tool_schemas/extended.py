@@ -47,6 +47,12 @@ search_type 선택:
 - "article_change": 일자별 조문 개정이력 (lsJoHstInf 목록)
 - "article_detail": 특정 조문의 개정이력 상세 (lsJoHstInf 본문, law_id 필수)
 
+주의: law_change·article_change·article_detail은 이 인증키로 항상 0건입니다.
+개정 시점을 확인하려면 version_list를 쓰세요.
+version_list는 시행일자별 버전을 법령일련번호(MST)와 함께 돌려주고,
+그 MST를 law_article_tool의 law_id로 넘기면 그 시점 조문이 나옵니다.
+두 시점을 각각 열어 대조하면 언제 바뀌었는지 확정할 수 있습니다.
+
 {DISCLAIMER}""",
         "inputSchema": {
             "type": "object",
@@ -54,7 +60,7 @@ search_type 선택:
             "properties": {
                 "search_type": {
                     "type": "string",
-                    "enum": ["law_change", "article_change", "article_detail"],
+                    "enum": ["version_list", "law_change", "article_change", "article_detail"],
                     "description": "조회 유형",
                 },
                 "query": {"type": "string", "description": "법령명 검색어"},

@@ -3,6 +3,7 @@ Law History Repository - 법령 변경이력·조문 개정이력 검색
 """
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Optional
 from .base import (
@@ -18,6 +19,106 @@ from .base import (
 
 class LawHistoryRepository(BaseLawRepository):
     """법령 변경이력(lsHstInf) 및 조문 개정이력(lsJoHstInf) 담당 Repository"""
+
+    async def list_law_versions(
+        self,
+        law_name: str,
+        page: int = 1,
+        per_page: int = 50,
+        arguments: Optional[dict] = None,
+    ) -> dict:
+        """법령의 시행일자별 버전 목록을 조회한다 (target=eflaw).
+
+        이력 API(lsHstInf·lsJoHstInf)는 이 인증키로 항상 0건이고 연혁 본문
+        (lsHistory)은 HTML만 준다. 그래서 "그 문언이 언제 바뀌었나"를
+        확인할 길이 없었는데, eflaw는 시행일자별 버전을 법령일련번호(MST)와
+        함께 준다. 그 MST로 과거 시점 조문을 조회하면 개정 전후를 대조할 수 있다.
+        """
+        if not law_name or not str(law_name).strip():
+            return {
+                "error": "law_name이 필요합니다.",
+                "recovery_guide": "버전 목록을 조회할 법령명을 지정하세요.",
+            }
+
+        law_name = self.resolve_law_name(str(law_name).strip())
+        cache_key = ("eflaw_versions", law_name, page, per_page)
+        if cache_key in search_cache:
+            return search_cache[cache_key]
+        if cache_key in failure_cache:
+            return failure_cache[cache_key]
+
+        try:
+            params = {
+                "target": "eflaw",
+                "type": "JSON",
+                "query": self.normalize_search_query(law_name),
+                "page": page,
+                "display": per_page,
+            }
+            _, api_key_error = self.attach_api_key(params, arguments, LAW_API_SEARCH_URL)
+            if api_key_error:
+                return api_key_error
+
+            response = await aget(LAW_API_SEARCH_URL, params=params, timeout=DRF_REQUEST_TIMEOUT_SEC)
+            invalid = self.validate_drf_response(response)
+            if invalid:
+                failure_cache[cache_key] = invalid
+                return invalid
+            response.raise_for_status()
+
+            try:
+                data = response.json()
+            except json.JSONDecodeError as e:
+                return {"error": f"API 응답이 유효한 JSON 형식이 아닙니다: {e}",
+                        "api_url": str(response.url)}
+
+            total, items = parse_drf_list(data, "law")
+
+            # 이름이 다른 법령(시행령·시행규칙 등)이 함께 잡히므로 정확히 일치하는 것만 남긴다
+            versions = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                if (item.get("법령명한글") or "").strip() != law_name:
+                    continue
+                versions.append({
+                    "시행일자": item.get("시행일자"),
+                    "법령일련번호": item.get("법령일련번호"),
+                    "현행연혁코드": item.get("현행연혁코드"),
+                    "공포일자": item.get("공포일자"),
+                    "공포번호": item.get("공포번호"),
+                    "제개정구분명": item.get("제개정구분명"),
+                })
+
+            versions.sort(key=lambda v: str(v.get("시행일자") or ""), reverse=True)
+
+            result = {
+                "law_name": law_name,
+                "total": total,
+                "versions": versions,
+                "api_url": str(response.url),
+                "note": (
+                    "법령일련번호(MST)를 law_article_tool의 mst 인자로 넘기면 "
+                    "그 시점 조문을 조회할 수 있습니다. 두 시점을 각각 조회해 "
+                    "대조하면 개정·삭제 시점을 확정할 수 있습니다."
+                ),
+            }
+            if not versions:
+                result["message"] = "해당 법령명과 정확히 일치하는 버전을 찾지 못했습니다."
+
+            search_cache[cache_key] = result
+            return result
+
+        except httpx.TimeoutException:
+            err = {"error_code": "API_ERROR_TIMEOUT", "error": "API 호출 타임아웃",
+                   "recovery_guide": "잠시 후 다시 시도하세요."}
+            failure_cache[cache_key] = err
+            return err
+        except httpx.RequestError as e:
+            return {"error": f"API 요청 실패: {e}"}
+        except Exception as e:
+            logger.exception("법령 버전 목록 조회 오류 | law_name=%s", law_name)
+            return {"error": f"예상치 못한 오류: {e}"}
 
     # ------------------------------------------------------------------ #
     # 법령 변경이력 (target=lsHstInf) — lawSearch.do

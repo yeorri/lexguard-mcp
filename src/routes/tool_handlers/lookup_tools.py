@@ -7,17 +7,29 @@ logger = logging.getLogger("lexguard-mcp")
 
 async def handle_law_article(arguments: dict, services: dict) -> dict:
     law_name = arguments.get("law_name")
+    # 법령일련번호(MST)를 주면 그 시점 버전의 조문을 조회한다.
+    # law_history_tool(version_list)로 과거 MST를 얻어 개정 전후를 대조할 때 쓴다.
+    law_id = arguments.get("law_id") or arguments.get("mst")
     article_number = arguments.get("article_number")
     hang = arguments.get("hang")
     ho = arguments.get("ho")
     mok = arguments.get("mok")
+
+    if not law_name and not law_id:
+        return {
+            "error": "law_name 또는 law_id 중 하나가 필요합니다.",
+            "recovery_guide": "법령명을 지정하거나, 특정 시점 버전을 볼 때는 "
+                              "law_history_tool(search_type=version_list)로 얻은 "
+                              "법령일련번호를 law_id로 넘기세요.",
+        }
+
     mode = "single" if article_number else "detail"
     logger.debug(
-        "Calling law_article_tool | law=%s article=%s hang=%s ho=%s mok=%s",
-        law_name, article_number, hang, ho, mok,
+        "Calling law_article_tool | law=%s law_id=%s article=%s hang=%s ho=%s mok=%s",
+        law_name, law_id, article_number, hang, ho, mok,
     )
     return await services["law_detail_repo"].get_law(
-        None, law_name, mode, article_number, hang, ho, mok, arguments,
+        law_id, law_name, mode, article_number, hang, ho, mok, arguments,
     )
 
 
@@ -129,6 +141,22 @@ async def handle_ministry_interpretation(arguments: dict, services: dict) -> dic
 
 async def handle_law_history(arguments: dict, services: dict) -> dict:
     per_page = max(1, min(50, int(arguments.get("per_page", 20))))
+    search_type = arguments.get("search_type", "law_change")
+
+    # 이력 계열 API(lsHstInf·lsJoHstInf)는 이 인증키로 항상 0건이고
+    # 연혁 본문(lsHistory)은 HTML만 준다. 대신 eflaw가 시행일자별 버전을
+    # MST와 함께 주므로, 그 MST로 과거 조문을 열어 개정 시점을 확정할 수 있다.
+    if search_type in ("version_list", "버전목록", "시행일목록"):
+        repo = services.get("law_history_repo")
+        if repo is None:
+            return {"error": "버전 목록 조회를 사용할 수 없습니다."}
+        return await repo.list_law_versions(
+            law_name=arguments.get("query") or arguments.get("law_name"),
+            page=int(arguments.get("page", 1)),
+            per_page=max(1, min(100, int(arguments.get("per_page", 50)))),
+            arguments=arguments,
+        )
+
     return await services["smart_search"].law_history_lookup(
         search_type=arguments.get("search_type", "law_change"),
         query=arguments.get("query"),

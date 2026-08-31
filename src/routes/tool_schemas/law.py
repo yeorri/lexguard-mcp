@@ -11,16 +11,24 @@ SCHEMAS = [
 조문번호는 '95', '제95조', 가지번호는 '167의3'(또는 167-3) 형식으로 지정합니다.
 hang·ho·mok을 지정하면 해당 부분만, 생략하면 조 전체를 반환합니다.
 
+과거 시점 조문이 필요하면 law_history_tool(search_type=version_list)로
+그 시점의 법령일련번호(MST)를 얻어 law_id에 넘기세요.
+
 응답 구성:
 - 원문: 국가법령정보센터가 준 조문단위 원본. 조문내용(두문)과 항·호·목이
   구조 그대로 들어 있으니 여기서 필요한 부분을 읽으세요.
-- title·조문시행일자·제개정일자·개정일자·삭제일자: 조회 편의용 메타""",
+- law_id: 조회에 쓰인 법령일련번호(MST). 다른 시점 조회에 재사용할 수 있습니다.""",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "law_name": {
                     "type": "string",
                     "description": "법령명 (예: 근로기준법, 민법, 형법, 개인정보보호법)"
+                },
+                "law_id": {
+                    "type": "string",
+                    "description": "법령일련번호(MST). 특정 시점 버전을 조회할 때 사용합니다. "
+                                   "law_history_tool(search_type=version_list)로 얻습니다."
                 },
                 "article_number": {
                     "type": "string",
