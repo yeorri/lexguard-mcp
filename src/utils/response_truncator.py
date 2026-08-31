@@ -181,12 +181,24 @@ def aggressive_truncate(result: Dict[str, Any], max_size: int) -> Dict[str, Any]
 
     # 1) 목록부터 줄인다. 검색 결과 개수를 줄이는 것이
     #    본문을 자르는 것보다 손실이 훨씬 적다.
+    #    개수는 고정하지 않고 한도 안에서 최대한 담는다.
+    #    (예전에는 무조건 5건으로 잘라 한도의 10%만 쓰고 나머지를 버렸다)
     for key, value in list(truncated.items()):
-        if isinstance(value, list) and len(value) > 5:
-            truncated[key] = value[:5]
-            truncated[f"{key}_truncated"] = True
-            truncated[f"{key}_total"] = len(value)
-            truncated[f"{key}_showing"] = 5
+        if not isinstance(value, list) or len(value) <= 1:
+            continue
+        keep = _fit_list_count(truncated, key, value, max_size)
+        if keep >= len(value):
+            continue
+        truncated[key] = value[:keep]
+        truncated[f"{key}_truncated"] = True
+        truncated[f"{key}_total"] = len(value)
+        truncated[f"{key}_showing"] = keep
+        truncated.setdefault(
+            "_truncation_note",
+            "응답 크기 한도로 목록 일부만 전달했습니다. "
+            "더 필요하면 page를 올려 다시 호출하거나, 검색어를 좁히거나, "
+            "항목을 조·건 단위로 나눠 여러 번 조회하세요.",
+        )
 
     if get_response_size(truncated) <= max_size:
         return truncated
@@ -213,6 +225,32 @@ def aggressive_truncate(result: Dict[str, Any], max_size: int) -> Dict[str, Any]
                 logger.info("Field truncated: %s", key)
 
     return truncated
+
+
+def _fit_list_count(container: Dict[str, Any], key: str, items: list, max_size: int) -> int:
+    """한도 안에 들어갈 수 있는 최대 항목 수를 이진 탐색으로 찾는다.
+
+    항목 크기가 제각각이라 평균으로 어림잡으면 한도를 넘거나
+    반대로 지나치게 적게 담는다.
+    """
+    original = container[key]
+    try:
+        container[key] = items
+        if get_response_size(container) <= max_size:
+            return len(items)
+
+        low, high, best = 1, len(items), 1
+        while low <= high:
+            mid = (low + high) // 2
+            container[key] = items[:mid]
+            if get_response_size(container) <= max_size:
+                best = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+        return best
+    finally:
+        container[key] = original
 
 
 def get_response_size(result: Dict[str, Any]) -> int:

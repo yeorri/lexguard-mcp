@@ -115,12 +115,12 @@ def test_초대형_응답은_여전히_제한된다():
     items = [{"조문내용": "가" * 900, "법령명": f"법률 {i}"} for i in range(400)]
     formatted = {
         "content": [{"type": "text", "text": json.dumps({"articles": items}, ensure_ascii=False)}],
-        "structuredContent": {"articles": items},
     }
     out = shrink_response_bytes(formatted)
     size = len(json.dumps(out, ensure_ascii=False).encode("utf-8"))
+    body = json.loads(out["content"][0]["text"])
     assert size <= MAX_RESPONSE_SIZE
-    assert len(out["structuredContent"]["articles"]) < len(items)
+    assert len(body["articles"]) < len(items)
 
 
 def test_api_url은_문자열로_저장된다():
@@ -167,3 +167,21 @@ def test_법령_약칭_해석(raw, expected):
     from src.repositories.base import BaseLawRepository
 
     assert BaseLawRepository.resolve_law_name(raw) == expected
+
+
+def test_절단시_한도를_최대한_채운다():
+    """예전에는 목록을 무조건 5건으로 잘라 한도의 10%만 쓰고 나머지를 버렸다."""
+    items = [{"조문내용": "가" * 900, "법령명": f"법률 {i}"} for i in range(400)]
+    payload = {"success": True, "total": 400, "articles": items}
+    resp = {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}]}
+
+    out = shrink_response_bytes(resp)
+    size = len(json.dumps(out, ensure_ascii=False).encode("utf-8"))
+    body = json.loads(out["content"][0]["text"])
+
+    assert size <= MAX_RESPONSE_SIZE
+    assert size > MAX_RESPONSE_SIZE * 0.5, "한도를 절반도 못 쓰면 지나치게 버리는 것"
+    assert len(body["articles"]) > 5
+    assert body["articles_total"] == 400
+    assert body["articles_showing"] == len(body["articles"])
+    assert "page" in body["_truncation_note"]
