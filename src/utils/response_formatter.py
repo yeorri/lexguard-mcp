@@ -168,7 +168,7 @@ def add_metadata(formatted: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         "integrated_search": "results.results 객체에 검색 타입별 결과가 있습니다. results.detected_intents로 감지된 의도를 확인하세요.",
         "situation_guidance": "results.guidance 배열에 단계별 가이드가 있습니다. results.laws, results.precedents, results.interpretations에 관련 법적 정보가 있습니다.",
         "document_issue": "results.document_analysis에 조항별 이슈와 근거 조회 힌트가 있습니다.",
-        "law_article": "results.원문에 조문단위 원본(조문내용=두문, 항·호·목)이 그대로 있습니다. 개정 시점은 results.개정일자·삭제일자를 보세요.",
+        "law_article": "results.원문에 조문단위 원본이 그대로 있습니다. 조문내용=두문(각 호 외의 부분), 항·호·목은 중첩 구조로, 개정 시점은 본문의 <개정 …> 표기와 조문시행일자에 있습니다.",
         "law_history": "results.history 배열에 법령 연혁이 있습니다.",
         "law_info": "results.info 객체에 법령 기본 정보가 있습니다.",
         # 실제 응답 키는 items다. forms로 안내하면 그대로 파싱했을 때 어긋난다.
@@ -588,21 +588,10 @@ def format_search_response(result: Dict[str, Any], tool_name: str) -> Dict[str, 
             "hang": result.get("hang"),
             "ho": result.get("ho"),
             "mok": result.get("mok"),
-            "title": result.get("title"),
-            # 조문은 원문(조문단위)만 전달한다.
-            # 조립 텍스트(content)를 함께 주면 같은 내용이 두 벌로 실려
-            # 토큰이 두 배가 되고, 둘 중 어느 쪽이 맞는지 대조하는 일까지
-            # 받는 쪽 몫이 된다. 조립은 텍스트가 계약인 fetch·resources에서만 쓴다.
-            # 원문을 못 얻은 경로(일부 폴백)에서만 조립본을 대신 싣는다.
+            # 조문 관련 값은 원문(조문단위)에 그대로 들어 있다.
+            # 제목·시행일자·개정 표기를 서버가 다시 뽑아 별도 필드로 담지 않는다.
+            # 원문을 못 얻은 폴백 경로에서만 조립 텍스트를 대신 싣는다.
             "content": None if result.get("원문") else result.get("content"),
-            # 개정이력 API가 이 인증키로는 항상 0건이라, 조문 본문의
-            # <개정 …>·삭제 <…> 표기에서 뽑은 시점이 유일한 확인 경로다.
-            "개정일자": result.get("개정일자"),
-            "삭제일자": result.get("삭제일자"),
-            "조문시행일자": result.get("조문시행일자"),
-            "제개정일자": result.get("제개정일자"),
-            "참고자료": result.get("참고자료"),
-            # 조립 결과가 틀렸을 때 대조할 수 있도록 조문단위 원본을 함께 준다
             "원문": result.get("원문"),
             "fallback": result.get("fallback"),
             "note": result.get("note"),

@@ -184,16 +184,13 @@ def test_값이_없는_필드는_응답에_싣지_않는다():
         "원문": {"조문번호": "94"},
         # 아래는 값이 없는 항목 — 응답에서 빠져야 한다
         "content": None,
-        "개정일자": None,
-        "삭제일자": None,
-        "참고자료": None,
         "note": None,
+        "fallback": None,
     }
     body = _payload(format_mcp_response(result, "law_article_tool"))
 
     assert [k for k, v in body.items() if v is None] == []
-    for dropped in ("content", "개정일자", "삭제일자", "참고자료", "note"):
+    for dropped in ("content", "note", "fallback"):
         assert dropped not in body
     # 값이 있는 항목은 그대로 남는다
-    assert body["title"] == "양도소득의 범위"
     assert body["원문"]["조문번호"] == "94"

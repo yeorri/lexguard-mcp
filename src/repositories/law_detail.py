@@ -6,7 +6,6 @@ import re
 
 import httpx
 from ..utils.http_client import aget
-from ..utils.amendment import extract_amendment_dates
 import json
 from typing import Any, Optional
 from datetime import datetime
@@ -1254,37 +1253,19 @@ class LawDetailRepository(BaseLawRepository):
                     "api_url": str(response.url),
                 }
 
-                # 조문 본문에 붙는 <개정 …> / 삭제 <…> 표기에서 개정 시점을 뽑는다.
-                # 개정이력 API(lsHstInf·lsJoHstInf)는 이 키로 항상 0건이라
-                # 특정 문언이 언제 바뀌었는지 확인할 유일한 경로다.
-                # 응답에 구조화된 메타가 함께 오면 본문 파싱보다 정확하다.
-                # (조문시행일자·조문제개정일자문자열·조문참고자료)
+                # 조문단위 원본을 그대로 싣는다.
+                # 조문내용(두문)·항·호·목은 물론 조문시행일자·조문제개정일자문자열·
+                # 조문참고자료, 그리고 본문에 붙는 <개정 …>·삭제 <…> 표기까지
+                # 여기 다 들어 있다. 같은 값을 서버가 다시 뽑아 별도 필드로
+                # 담으면 응답만 커지고, 필터 조회 때는 좁혀진 조각만 파싱해
+                # 원문에는 있는 값이 필드에서는 비는 불일치까지 생긴다.
                 source_unit = None
                 for cand in (locals().get("matched_article"), locals().get("josub_unit")):
                     if isinstance(cand, dict):
                         source_unit = cand
                         break
                 if source_unit:
-                    for key, out in (
-                        ("조문시행일자", "조문시행일자"),
-                        ("조문제개정일자문자열", "제개정일자"),
-                        ("조문참고자료", "참고자료"),
-                    ):
-                        value = source_unit.get(key)
-                        if isinstance(value, str) and value.strip():
-                            result[out] = value.strip()
-
-                    # 조립(content)은 편의를 위한 것이고, 조문 구조는 예외가 많아
-                    # 렌더링이 틀리면 답이 통째로 틀어진다. 그래서 매칭된
-                    # 조문단위 원본을 함께 실어 대조할 수 있게 한다.
-                    # (조문 하나 분량이라 크기 부담은 1~2천 자 수준)
                     result["원문"] = source_unit
-
-                revisions, deletions = extract_amendment_dates(article_content)
-                if revisions:
-                    result["개정일자"] = revisions
-                if deletions:
-                    result["삭제일자"] = deletions
 
                 if fallback_mode and fallback_mode != "none":
                     result["fallback"] = {
