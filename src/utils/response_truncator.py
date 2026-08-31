@@ -4,20 +4,40 @@
 한도를 넘으면 목록을 줄이고, 그래도 크면 긴 문자열을 자른다.
 
 한도 설정 근거: 조문 하나가 온전히 들어가야 한다.
-소득세법 시행령 제167조의3처럼 호가 많은 조문은 본문만 약 15,000자
-(UTF-8 약 40KB)이고, MCP 응답은 content 텍스트와 structuredContent에
-같은 내용을 두 번 담으므로 약 80KB가 된다.
-한도가 24KB이던 시절에는 이런 조문이 500자로 잘려 각 호가 통째로
-사라졌다 — 조문 조회 도구로서는 결과가 없는 것만 못하다.
+소득세법 시행령 제167조의3처럼 호가 많은 조문은 본문만 약 16,800자
+(UTF-8 약 50KB)다. 한도가 24KB이던 시절에는 이런 조문이 500자로 잘려
+각 호가 통째로 사라졌다 — 조문 조회 도구로서는 결과가 없는 것만 못하다.
+
+한도는 LEXGUARD_MAX_RESPONSE_BYTES로 조절할 수 있다.
 """
 import json
 import logging
+import os
 from typing import Dict, Any
 
 logger = logging.getLogger("lexguard-mcp")
 
-# 긴 조문 하나가 중복 저장(content + structuredContent)돼도 들어갈 크기
-MAX_RESPONSE_SIZE = 120000  # bytes
+# 응답 1회당 최대 크기. 한글은 1자가 3바이트라 120,000B는 약 4만 자다.
+# 가장 긴 조문(소득세법 시행령 제167조의3, 16,806자)이 42% 수준이라
+# 조문 조회로는 걸리지 않는다. 검색 목록이 클 때만 개수를 줄인다.
+#
+# 더 키우면 한 번의 호출이 대화 컨텍스트를 그만큼 먹는다.
+# 4만 자면 이미 상당한 양이고, 예전에 468KB 응답을 그대로 내보냈을 때
+# 클라이언트가 4분 타임아웃에 걸렸다. 필요하면 환경변수로 조절한다.
+def _max_response_size() -> int:
+    raw = (os.environ.get("LEXGUARD_MAX_RESPONSE_BYTES") or "").strip()
+    if raw:
+        try:
+            value = int(raw)
+            if value >= 10000:
+                return value
+            logger.warning("LEXGUARD_MAX_RESPONSE_BYTES가 너무 작아 무시합니다: %s", raw)
+        except ValueError:
+            logger.warning("LEXGUARD_MAX_RESPONSE_BYTES 값이 숫자가 아닙니다: %s", raw)
+    return 120000
+
+
+MAX_RESPONSE_SIZE = _max_response_size()  # bytes
 RESERVE_SIZE = 500  # JSON 구조용 여유 공간 (메타데이터, 필드명 등)
 TARGET_SIZE = MAX_RESPONSE_SIZE - RESERVE_SIZE  # 실제 콘텐츠용 크기
 
