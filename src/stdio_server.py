@@ -213,9 +213,26 @@ def _write(response: dict) -> None:
     _STDOUT.flush()
 
 
+async def _handle_and_write(message: dict) -> None:
+    """요청 하나를 처리하고 응답 한 줄을 기록한다."""
+    try:
+        response = await handle_message(message)
+    except Exception as e:
+        logger.error("Internal error: %s", e, exc_info=True)
+        response = {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "error": {"code": -32603, "message": f"Internal error: {e}"},
+        }
+
+    if response is not None:
+        _write(response)
+
+
 async def main() -> None:
     logger.info("LexGuard MCP (stdio) 시작 | tools=%d", len(TOOLS_LIST))
     stdin = sys.stdin.buffer
+    pending: set[asyncio.Task] = set()
 
     while True:
         # Windows에서 connect_read_pipe는 콘솔/파이프 조합에 따라 실패하므로
@@ -235,18 +252,17 @@ async def main() -> None:
             _write({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}})
             continue
 
-        try:
-            response = await handle_message(message)
-        except Exception as e:
-            logger.error("Internal error: %s", e, exc_info=True)
-            response = {
-                "jsonrpc": "2.0",
-                "id": message.get("id"),
-                "error": {"code": -32603, "message": f"Internal error: {e}"},
-            }
+        # 요청마다 태스크로 띄운다. 예전에는 여기서 await 해버려 앞 요청이
+        # 끝날 때까지 다음 줄을 읽지도 않았다. 클라이언트가 도구를 여러 개
+        # 동시에 부르면 줄줄이 대기하다 무응답처럼 보였다.
+        # 응답은 id로 짝지어지므로 순서가 바뀌어도 문제없다.
+        task = asyncio.create_task(_handle_and_write(message))
+        pending.add(task)
+        task.add_done_callback(pending.discard)
 
-        if response is not None:
-            _write(response)
+    # 남은 요청을 마저 처리하고 정리
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
 
     from .utils.http_client import close_async_client, close_sync_client
 
