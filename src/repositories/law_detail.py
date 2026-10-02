@@ -1013,6 +1013,8 @@ class LawDetailRepository(BaseLawRepository):
                 # 조문 내용 추출
                 article_content = None
                 article_title = None
+                # 본문을 실제로 꺼낸 조문단위. 이것만 원문으로 싣는다.
+                content_unit = None
 
                 root = data
                 if isinstance(data, dict) and "법령" in data:
@@ -1070,6 +1072,8 @@ class LawDetailRepository(BaseLawRepository):
                                     or josub_unit.get("articleContent")
                                     or josub_unit.get("내용")
                                 )
+                            if article_content and str(article_content).strip():
+                                content_unit = josub_unit
 
                 if not (article_content and str(article_content).strip()):
                     lawjosub_params = {k: v for k, v in params.items() if k != "efYd"}
@@ -1126,6 +1130,8 @@ class LawDetailRepository(BaseLawRepository):
                                                 article_content = self._render_article_text(josub_unit)
                                         if not (article_content and str(article_content).strip()):
                                             article_content = josub_unit.get("조문내용") or josub_unit.get("내용")
+                                        if article_content and str(article_content).strip():
+                                            content_unit = josub_unit
 
                             if article_content:
                                 logger.info(
@@ -1230,6 +1236,7 @@ class LawDetailRepository(BaseLawRepository):
                                     )
 
                                 if article_content and str(article_content).strip():
+                                    content_unit = matched_article
                                     logger.info(
                                         "law target fallback succeeded | law_id=%s jo=%s",
                                         law_id,
@@ -1278,13 +1285,11 @@ class LawDetailRepository(BaseLawRepository):
                 # 여기 다 들어 있다. 같은 값을 서버가 다시 뽑아 별도 필드로
                 # 담으면 응답만 커지고, 필터 조회 때는 좁혀진 조각만 파싱해
                 # 원문에는 있는 값이 필드에서는 비는 불일치까지 생긴다.
-                source_unit = None
-                for cand in (locals().get("matched_article"), locals().get("josub_unit")):
-                    if isinstance(cand, dict):
-                        source_unit = cand
-                        break
-                if source_unit:
-                    result["원문"] = source_unit
+                # 본문이 lawjosub 최상위나 HTML 폴백에서 왔으면 원문을 싣지 않는다.
+                # 메타만 담긴 조문단위를 원문으로 실으면 formatter가 content를
+                # 비우므로 복구한 본문이 사라진다.
+                if content_unit:
+                    result["원문"] = content_unit
 
                 if fallback_mode and fallback_mode != "none":
                     result["fallback"] = {
