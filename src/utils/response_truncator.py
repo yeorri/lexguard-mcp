@@ -10,6 +10,7 @@
 
 한도는 LEXGUARD_MAX_RESPONSE_BYTES로 조절할 수 있다.
 """
+import copy
 import json
 import logging
 import os
@@ -359,15 +360,19 @@ def _shrink_content_only(result: Dict[str, Any], max_bytes: int) -> Dict[str, An
     if not isinstance(payload, dict):
         return result
 
-    for _ in range(4):
-        payload = aggressive_truncate(payload, max_bytes)
-        target["text"] = json.dumps(payload, ensure_ascii=False)
-        if get_response_size(result) <= max_bytes:
+    # 페이로드를 한도에 맞춰도 JSON 문자열로 다시 감싸면 따옴표 이스케이프만큼
+    # (약 10%) 커진다. 예전에는 이때 precedents·laws 목록을 통째로 지워
+    # 결과가 0건처럼 보였다. 초과분만큼 예산을 줄여 다시 맞춘다.
+    budget = max_bytes
+    for _ in range(6):
+        trimmed = aggressive_truncate(copy.deepcopy(payload), budget)
+        target["text"] = json.dumps(trimmed, ensure_ascii=False)
+        size = get_response_size(result)
+        if size <= max_bytes:
             return result
-        payload = _reduce_structured_content(payload)
-        target["text"] = json.dumps(payload, ensure_ascii=False)
-        if get_response_size(result) <= max_bytes:
-            return result
+        budget -= (size - max_bytes) + 256
+        if budget <= 0:
+            break
 
     return result
 
