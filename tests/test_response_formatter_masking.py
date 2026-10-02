@@ -69,14 +69,18 @@ def test_sanitize_masks_api_url_in_nested_dict():
     assert "NestedKeyValue" not in sanitized["result"]["items"][0]["api_url"]
 
 
-def test_sanitize_leaves_non_api_url_strings_alone():
-    """api_url 외 다른 키에 동일 URL이 들어가도 마스킹 대상 아님 (키 기반 매칭)."""
+def test_sanitize_masks_oc_in_any_string():
+    """키 이름과 무관하게 마스킹한다.
+
+    예전에는 api_url 키만 가렸는데, DRF 목록 항목의 상세링크 등 다른 필드에
+    실제 키가 평문으로 실려 나갔다.
+    """
     payload = {
         "url": "https://x.com/?OC=LexGuardKey",
         "api_url": "https://x.com/?OC=LexGuardKey",
     }
     sanitized = sanitize_for_mcp_json(payload)
-    assert sanitized["url"] == "https://x.com/?OC=LexGuardKey"
+    assert "LexGuardKey" not in sanitized["url"]
     assert "LexGuardKey" not in sanitized["api_url"]
 
 

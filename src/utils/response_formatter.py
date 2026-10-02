@@ -3,11 +3,29 @@
 apis 폴더의 response_fields를 기반으로 구조화
 """
 import json
+import re
 import urllib.parse
 from typing import Any, Dict, Optional
 
 import httpx
 
+_OC_PARAM = re.compile(r"([?&]OC=)([^&\s\"'<>#\\]+)")
+
+
+def _mask_oc_value(oc: str) -> str:
+    return oc[:4] + "****" + oc[-4:] if len(oc) > 8 else oc[:2] + "****" + oc[-2:]
+
+
+def mask_oc_in_text(text: str) -> str:
+    """문자열 어디에 있든 OC 파라미터(API 키)를 가린다.
+
+    DRF 목록 항목의 '판례상세링크'·'행정심판재결례상세링크' 같은 필드와
+    오류 메시지(예외 문자열에 요청 URL이 들어감), fetch가 JSON으로 묶은
+    본문에는 api_url 키가 아닌 곳에 키가 평문으로 들어 있다.
+    """
+    if "OC=" not in text:
+        return text
+    return _OC_PARAM.sub(lambda m: m.group(1) + _mask_oc_value(m.group(2)), text)
 
 
 def mask_oc_in_url(url: Any) -> Any:
@@ -25,8 +43,7 @@ def mask_oc_in_url(url: Any) -> Any:
             return url
         oc = query["OC"][0] if query["OC"] else ""
         if oc:
-            masked = oc[:4] + "****" + oc[-4:] if len(oc) > 8 else oc[:2] + "****" + oc[-2:]
-            query["OC"] = [masked]
+            query["OC"] = [_mask_oc_value(oc)]
         new_query = urllib.parse.urlencode(query, doseq=True, safe="*")
         return urllib.parse.urlunparse(parsed._replace(query=new_query))
     except Exception:
@@ -37,8 +54,10 @@ def sanitize_for_mcp_json(obj: Any) -> Any:
     """
     Repository 등에서 httpx.Response.url(httpx.URL)이 그대로 들어오면
     json.dumps가 실패하므로 MCP 직렬화 직전에 문자열로 정리한다.
-    또한 응답에 노출되는 `api_url` 키 값은 OC API 키를 마스킹한다.
+    또한 응답에 노출되는 OC API 키를 키 이름과 무관하게 모든 문자열에서 마스킹한다.
     """
+    if isinstance(obj, str):
+        return mask_oc_in_text(obj)
     if isinstance(obj, httpx.URL):
         return mask_oc_in_url(str(obj))
     mod = getattr(type(obj), "__module__", "") or ""

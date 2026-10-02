@@ -45,7 +45,7 @@ from .routes.mcp_routes import _build_prompts_list, _get_prompt  # noqa: E402
 from .routes.resource_handlers import build_resources_list, read_resource  # noqa: E402
 from .routes.tool_handlers import dispatch  # noqa: E402
 from .routes.tool_schemas import TOOLS_LIST  # noqa: E402
-from .utils.response_formatter import format_mcp_response, sanitize_for_mcp_json  # noqa: E402
+from .utils.response_formatter import format_mcp_response, mask_oc_in_text, sanitize_for_mcp_json  # noqa: E402
 from .utils.response_truncator import shrink_response_bytes  # noqa: E402
 
 logger = setup_logging()
@@ -146,7 +146,7 @@ async def handle_message(message: dict) -> dict | None:
         return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
     def err(code, msg):
-        return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": msg}}
+        return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": mask_oc_in_text(str(msg))}}
 
     if method == "initialize":
         logger.info("MCP(stdio): initialize")
@@ -222,7 +222,7 @@ async def _handle_and_write(message: dict) -> None:
         response = {
             "jsonrpc": "2.0",
             "id": message.get("id"),
-            "error": {"code": -32603, "message": f"Internal error: {e}"},
+            "error": {"code": -32603, "message": mask_oc_in_text(f"Internal error: {e}")},
         }
 
     if response is not None:
