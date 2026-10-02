@@ -144,3 +144,20 @@ from src.repositories.base import BaseLawRepository as _B  # noqa: E402
 )
 def test_조문번호_가지번호_표기(raw, expected):
     assert _B.parse_article_number(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "wrapper, key",
+    [("Decc", "decc"), ("Expc", "expc"), ("CgmExpc", "cgmExpc"), ("Ppc", "ppc")],
+)
+def test_0건이면_wrapper를_1건으로_세지_않는다(wrapper, key):
+    """wrapper 이름이 데이터 키와 대소문자만 다르면, 0건 응답에서 wrapper 자체가
+    후보 키로 잡혀 메타 dict가 "1건"으로 보고됐다(실측: 행정심판 '양도소득세')."""
+    data = {wrapper: {"키워드": "양도소득세", "page": "1", "target": key.lower(), "totalCnt": "0"}}
+    assert parse_drf_list(data, key) == (0, [])
+
+
+def test_결과가_있으면_데이터키를_그대로_읽는다():
+    data = {"Decc": {"totalCnt": "2", "decc": [{"사건명": "A"}, {"사건명": "B"}]}}
+    total, items = parse_drf_list(data, "decc")
+    assert total == 2 and [i["사건명"] for i in items] == ["A", "B"]

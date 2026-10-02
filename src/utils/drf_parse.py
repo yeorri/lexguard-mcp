@@ -40,14 +40,24 @@ def _to_int(value: Any) -> int:
 
 
 def _lookup(container: dict, candidates: Tuple[str, ...]) -> Any:
-    """지정된 후보 키를 대소문자 무시하고 찾는다. 못 찾으면 None."""
+    """지정된 후보 키를 대소문자 무시하고 찾는다. 못 찾으면 None.
+
+    wrapper 이름이 데이터 키와 대소문자만 다른 target(Decc/decc, Expc/expc,
+    CgmExpc/cgmExpc, Ppc/ppc)은 0건이면 wrapper 안에 데이터 키가 없어서
+    최상위의 wrapper 자체가 후보 키로 잡힌다. 그러면 메타 dict가 "1건"으로
+    보고되므로 wrapper는 건너뛴다.
+    """
     if not isinstance(container, dict):
         return None
     lowered = {k.lower(): k for k in container}
     for cand in candidates:
         actual = lowered.get(cand.lower())
-        if actual is not None:
-            return container[actual]
+        if actual is None:
+            continue
+        value = container[actual]
+        if isinstance(value, dict) and _is_wrapper(value):
+            continue
+        return value
     return None
 
 
