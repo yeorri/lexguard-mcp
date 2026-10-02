@@ -6,6 +6,7 @@ import re
 
 import httpx
 from ..utils.http_client import aget
+from ..utils.drf_parse import parse_drf_list
 import json
 from typing import Any, Optional
 from datetime import datetime
@@ -15,7 +16,10 @@ from .base import (
     LAW_API_BASE_URL,
     LAW_API_SEARCH_URL,
     DRF_REQUEST_TIMEOUT_SEC,
+    search_cache,
 )
+
+ADDENDUM_LIST_WORDS = {"목록", "전체", "list", "all", "*"}
 
 
 class LawDetailRepository(BaseLawRepository):
@@ -1360,6 +1364,189 @@ class LawDetailRepository(BaseLawRepository):
                 "article_number": article_number,
                 "recovery_guide": "시스템 오류가 발생했습니다. 서버 로그를 확인하거나 관리자에게 문의하세요.",
             }
+
+    @staticmethod
+    def parse_addendum_number(value: Any, allow_bare: bool = True) -> Optional[str]:
+        """부칙을 만든 개정법령의 공포번호를 뽑는다 ('법률 제17482호' → '17482').
+
+        '법률 제17482호, 2020.8.18.'처럼 날짜가 섞여 와도 '제N호'를 우선한다.
+        article_number('부칙 제5조')에서 뽑을 때는 조·호 번호를 공포번호로
+        오인하지 않도록 세 자리 이상의 '제N호'만 받는다(allow_bare=False).
+        """
+        text = str(value or "")
+        m = re.search(r"제\s*(\d+)\s*호", text)
+        if m and (allow_bare or len(m.group(1)) >= 3):
+            return str(int(m.group(1)))
+        if allow_bare:
+            nums = re.findall(r"\d+", text)
+            if len(nums) == 1:
+                return str(int(nums[0]))
+        return None
+
+    async def _resolve_law_mst(
+        self, law_name: str, arguments: Optional[dict[str, Any]] = None
+    ) -> tuple[Optional[str], Optional[dict[str, Any]]]:
+        """법령명으로 현행 법령일련번호(MST)만 찾는다.
+
+        get_law_detail은 법령 전체(소득세법 시행령 약 2.4MB)를 내려받아
+        부칙 조회 때 같은 본문을 두 번 받게 되므로 검색 결과만 쓴다.
+        """
+        params = {
+            "target": "law",
+            "type": "JSON",
+            "query": self.normalize_search_query(law_name),
+            "page": 1,
+            "display": 20,
+        }
+        _, api_key_error = self.attach_api_key(params, arguments, LAW_API_SEARCH_URL)
+        if api_key_error:
+            return None, api_key_error
+        response = await aget(LAW_API_SEARCH_URL, params=params, timeout=DRF_REQUEST_TIMEOUT_SEC)
+        invalid = self.validate_drf_response(response)
+        if invalid:
+            return None, invalid
+        response.raise_for_status()
+
+        _, items = parse_drf_list(response.json(), "law")
+        wanted = self.normalize_search_query(law_name)
+        names = [(self.normalize_search_query(it.get("법령명한글") or ""), it) for it in items]
+        for name, it in names:
+            if name == wanted:
+                return it.get("법령일련번호"), None
+        for name, it in names:
+            if wanted in name:
+                return it.get("법령일련번호"), None
+        return None, {
+            "error_code": "LAW_NOT_FOUND",
+            "error": f"'{law_name}' 법령을 찾지 못했습니다.",
+            "recovery_guide": "정식 법령명을 지정하세요. 예: '소득세법 시행령', '민간임대주택에 관한 특별법'.",
+            "api_url": str(response.url),
+        }
+
+    async def _fetch_addendum_units(
+        self, law_id: str, arguments: Optional[dict[str, Any]] = None
+    ) -> tuple[list[dict[str, Any]], Optional[str], Optional[dict[str, Any]]]:
+        """법령 본문 응답의 부칙단위 목록을 받는다 (법령일련번호별 캐시)."""
+        cache_key = ("law_addenda", str(law_id))
+        if cache_key in search_cache:
+            units, api_url = search_cache[cache_key]
+            return units, api_url, None
+
+        params = {"target": "law", "type": "JSON", "MST": law_id}
+        _, api_key_error = self.attach_api_key(params, arguments, LAW_API_BASE_URL)
+        if api_key_error:
+            return [], None, api_key_error
+        response = await aget(LAW_API_BASE_URL, params=params, timeout=DRF_REQUEST_TIMEOUT_SEC)
+        invalid = self.validate_drf_response(response)
+        if invalid:
+            return [], None, invalid
+        response.raise_for_status()
+
+        data = response.json()
+        root = data.get("법령", data) if isinstance(data, dict) else {}
+        section = root.get("부칙") if isinstance(root, dict) else None
+        if isinstance(section, dict):
+            units = self._as_dict_list(section.get("부칙단위"))
+        else:
+            units = self._as_dict_list(section)
+        api_url = str(response.url)
+        search_cache[cache_key] = (units, api_url)
+        return units, api_url, None
+
+    async def get_law_addendum(
+        self,
+        law_id: Optional[str] = None,
+        law_name: Optional[str] = None,
+        addendum: Any = None,
+        arguments: Optional[dict[str, Any]] = None,
+        number_required: bool = False,
+    ) -> dict[str, Any]:
+        """부칙을 개정법령 공포번호 단위로 조회한다.
+
+        법령 본문 응답(target=law)의 부칙단위에는 제정·전부개정 이후의 부칙이
+        모두 쌓여 있다(소득세법 시행령 현행본에 1994년 이후 209건). 그래서
+        현행 버전 하나에서 공포번호로 고르면 과거 개정 부칙도 찾을 수 있다.
+        부칙은 원문(부칙단위) 그대로 반환한다.
+        """
+        law_name = self.resolve_law_name(law_name)
+        try:
+            if not law_id:
+                law_id, err = await self._resolve_law_mst(law_name, arguments)
+                if err:
+                    return err
+            units, api_url, err = await self._fetch_addendum_units(law_id, arguments)
+            if err:
+                return err
+        except httpx.TimeoutException:
+            return {
+                "error_code": "API_ERROR_TIMEOUT",
+                "error": "API 호출 타임아웃",
+                "law_id": law_id,
+                "recovery_guide": "네트워크 응답 시간이 초과되었습니다. 잠시 후 다시 시도하세요.",
+            }
+        except httpx.RequestError as e:
+            return {
+                "error": f"API 요청 실패: {e}",
+                "law_id": law_id,
+                "recovery_guide": "네트워크 오류입니다. 잠시 후 다시 시도하세요.",
+            }
+        except Exception as e:
+            logger.exception("부칙 조회 오류 | law_id=%s law_name=%s", law_id, law_name)
+            return {"error": f"예상치 못한 오류: {e}", "law_id": law_id}
+
+        listing = [
+            {"부칙공포번호": u.get("부칙공포번호"), "부칙공포일자": u.get("부칙공포일자")}
+            for u in units
+        ]
+        base = {"law_id": law_id, "api_url": api_url}
+
+        if not units:
+            return {
+                **base,
+                "error_code": "ADDENDUM_NOT_FOUND",
+                "error": f"법령일련번호 {law_id}의 응답에 부칙이 없습니다.",
+                "recovery_guide": "법령명·법령일련번호가 맞는지 확인하세요.",
+            }
+
+        if str(addendum or "").strip().lower() in ADDENDUM_LIST_WORDS:
+            return {**base, "부칙목록": listing}
+
+        number = self.parse_addendum_number(addendum, allow_bare=not number_required)
+        if number is None:
+            return {
+                **base,
+                "error_code": "ADDENDUM_NUMBER_REQUIRED",
+                "error": "부칙은 조 번호가 아니라 그 부칙을 만든 개정법령의 공포번호로 지정해야 합니다.",
+                "recovery_guide": (
+                    "addendum에 공포번호를 넣으세요(예: 법률 제17482호 부칙 → addendum='17482'). "
+                    "이 법령의 부칙 공포번호는 부칙목록에 있습니다."
+                ),
+                "부칙목록": listing,
+            }
+
+        matched = [
+            u for u in units
+            if self.parse_addendum_number(u.get("부칙공포번호")) == number
+        ]
+        if not matched:
+            return {
+                **base,
+                "error_code": "ADDENDUM_NOT_FOUND",
+                "error": f"이 법령의 부칙 중 공포번호 제{number}호가 없습니다.",
+                "recovery_guide": (
+                    "부칙은 그 부칙을 둔 법령에서 조회합니다(시행령 부칙은 시행령, 법률 부칙은 법률). "
+                    "전부개정 이전의 부칙이면 law_history_tool(search_type=version_list)로 "
+                    "그 시점 법령일련번호를 얻어 law_id로 지정하세요. "
+                    "이 법령에 있는 부칙 공포번호는 부칙목록에 있습니다."
+                ),
+                "부칙목록": listing,
+            }
+
+        return {
+            **base,
+            "addendum": number,
+            "원문": matched[0] if len(matched) == 1 else matched,
+        }
 
     async def get_law(
         self,

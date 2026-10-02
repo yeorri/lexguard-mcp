@@ -23,6 +23,19 @@ async def handle_law_article(arguments: dict, services: dict) -> dict:
                               "법령일련번호를 law_id로 넘기세요.",
         }
 
+    addendum = arguments.get("addendum")
+    if addendum in (None, "") and isinstance(article_number, str) and "부칙" in article_number:
+        # '부칙 제5조'를 조문번호로 해석하면 숫자만 남아 본문 제5조가
+        # 부칙인 것처럼 반환된다. 부칙 경로로 돌리되, 공포번호는
+        # '법률 제17482호 부칙'처럼 명시된 경우에만 받는다.
+        return await services["law_detail_repo"].get_law_addendum(
+            law_id, law_name, article_number, arguments, number_required=True,
+        )
+    if addendum not in (None, ""):
+        return await services["law_detail_repo"].get_law_addendum(
+            law_id, law_name, addendum, arguments,
+        )
+
     mode = "single" if article_number else "detail"
     logger.debug(
         "Calling law_article_tool | law=%s law_id=%s article=%s hang=%s ho=%s mok=%s",

@@ -186,6 +186,12 @@ def add_metadata(formatted: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
         elif formatted.get("articles"):
             meta["parsing_hint"] = "results.articles 배열에 조문 목록이 있습니다."
 
+    if tool_name == "law_article_tool":
+        if formatted.get("addendum"):
+            meta["parsing_hint"] = "results.원문에 부칙단위 원본이 그대로 있습니다. 부칙내용에 조별 문언이 줄 단위로 있습니다."
+        elif formatted.get("부칙목록"):
+            meta["parsing_hint"] = "results.부칙목록에 이 법령의 부칙 공포번호·공포일자가 있습니다. addendum에 공포번호를 넣어 본문을 조회하세요."
+
     if tool_name == "smart_search_tool":
         if formatted.get("results"):
             result_types = list(formatted.get("results", {}).keys())
@@ -214,6 +220,8 @@ def format_search_response(result: Dict[str, Any], tool_name: str) -> Dict[str, 
             "error": result["error"],
             "recovery_guide": result.get("recovery_guide"),
             "note": result.get("note"),
+            # 부칙 공포번호를 잘못 짚었을 때 고를 수 있는 후보 (law_article_tool)
+            "부칙목록": result.get("부칙목록"),
             "api_url": result.get("api_url")
         }
 
@@ -584,6 +592,8 @@ def format_search_response(result: Dict[str, Any], tool_name: str) -> Dict[str, 
         return {
             "success": True,
             "law_id": result.get("law_id"),
+            "addendum": result.get("addendum"),
+            "부칙목록": result.get("부칙목록"),
             "article_number": result.get("article_number"),
             "hang": result.get("hang"),
             "ho": result.get("ho"),
