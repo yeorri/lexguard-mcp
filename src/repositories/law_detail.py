@@ -3,6 +3,7 @@ Law Detail Repository - 법령 조회 기능
 """
 
 import re
+import unicodedata
 
 import httpx
 from ..utils.http_client import aget
@@ -250,31 +251,45 @@ class LawDetailRepository(BaseLawRepository):
         if not hang_items or not hang:
             return None
 
-        target_key = LawDetailRepository._normalize_article_match_key(hang)
-        circled_map = {
-            "1": "①",
-            "2": "②",
-            "3": "③",
-            "4": "④",
-            "5": "⑤",
-            "6": "⑥",
-            "7": "⑦",
-            "8": "⑧",
-            "9": "⑨",
-            "10": "⑩",
-        }
-        circled_target = circled_map.get(target_key)
-        if circled_target:
-            for hang_item in hang_items:
-                if str(hang_item.get("항번호") or "").strip() == circled_target:
-                    return hang_item
+        target = LawDetailRepository._hang_number(
+            LawDetailRepository._normalize_article_match_key(hang)
+        )
+        if target is None:
+            return None
 
-        if target_key.isdigit():
-            index = int(target_key) - 1
-            if 0 <= index < len(hang_items):
-                return hang_items[index]
+        numbered = [
+            (LawDetailRepository._hang_number(item.get("항번호")), item)
+            for item in hang_items
+        ]
+        for number, item in numbered:
+            if number == target:
+                return item
+
+        # 위치로 고르는 것은 항번호가 아예 없을 때만 한다. 항 필터(HANG)를 건
+        # 응답은 그 항 하나만 오므로 위치로 찾으면 범위를 벗어나고, 삭제된 항이
+        # 빠진 목록에서는 엉뚱한 항을 조용히 고르게 된다.
+        if all(number is None for number, _ in numbered) and 0 < target <= len(hang_items):
+            return hang_items[target - 1]
 
         return None
+
+    @staticmethod
+    def _hang_number(value: Any) -> Optional[int]:
+        """항번호를 정수로 ('① '→1, '㉓'→23, '제23항'→23).
+
+        원문자는 ①~⑳ 다음 ㉑~㉟, ㊱~㊿가 서로 다른 유니코드 블록에 있어
+        ⑩까지만 나열한 표로는 제11항 이후를 못 찾았다.
+        """
+        text = str(value or "").strip()
+        if not text:
+            return None
+        if len(text) == 1:
+            try:
+                return int(unicodedata.numeric(text))
+            except (TypeError, ValueError):
+                return None
+        digits = re.sub(r"\D", "", text)
+        return int(digits) if digits else None
 
     @staticmethod
     def _find_ho_item(
