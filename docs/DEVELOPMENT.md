@@ -80,6 +80,8 @@
 - 조문 조회: `eflawjosub`가 메타만 주는 조문이 있어 법령 전체(`target=law&MST=`)를 받아 조문단위를 찾는다. 소득세법 시행령 전체 응답은 약 3MB.
 - 조문번호 JO는 6자리(`015603` = 제156조의3). 가지번호 구분자로 `의`·`-`·`.`·`_` 모두 인식.
 - 약칭 API(`lsAbrv`)는 검색어를 무시하고 전체 목록만 줘서 못 쓴다 → `BaseLawRepository.LAW_NAME_ALIASES`로 직접 매핑(조특법·상증법·부가법 등).
+- **부칙**: 별도 API 없이 법령 본문(`target=law&MST=`) 응답의 `부칙.부칙단위`에 들어 있다. 현행본 하나에 제정·전부개정 이후 부칙이 모두 쌓여 있다(소득세법 시행령 1994년 이후 209건, 조특법 209건). `부칙공포번호`로 고른다(앞자리 0 있음: `04803`). 시행령 부칙은 시행령에, 법률 부칙은 법률에 있다.
+- 항번호는 원문자(`① `, 뒤에 공백)다. ⑳ 다음 ㉑~㉟·㊱~㊿는 다른 유니코드 블록이라 `unicodedata.numeric`으로 정수화한다. 항 필터(`HANG`)를 걸면 그 항 하나만 온다.
 
 ### 이 인증키로 안 되는 것
 - **이력 API**(`lsHstInf`·`lsJoHstInf`): 파라미터 무관 항상 totalCnt=0 (인증 오류 아님). 신청 목록에 '이력' 항목 없음.
@@ -103,6 +105,8 @@
 - `ai_search_tool`·`legal_term_tool`의 `operation`은 선택. 생략·영문 표현도 받는다(생략 시 필수로 막아 가장 흔한 호출이 실패했었음).
 - `fetch`는 `law://`·`rule://`·`case://`·`interpret://`·`appeal://` 지원. `rule://<행정규칙일련번호>`로 고시 본문 조회.
 - 없는 조문·항을 요청하면 `ARTICLE_NOT_FOUND`·`SUBSECTION_NOT_FOUND` 오류(예전엔 조 제목만 담아 success로 보고했음).
+- `law_article_tool(addendum=<공포번호>)`로 부칙단위 원문을 받는다. `addendum='목록'`이면 공포번호·공포일자 목록.
+  `article_number`에 '부칙'이 들어오면 본문 조회로 보내지 않는다(`ADDENDUM_NUMBER_REQUIRED` + 부칙목록). 없는 번호는 `ADDENDUM_NOT_FOUND` + 부칙목록.
 
 ---
 
@@ -128,6 +132,12 @@
 | 과거 조문 조회 불가 | 핸들러가 `law_id`를 버리고 None 전달 |
 | 동시 호출이 밀림 | stdio 루프가 요청을 직렬 처리 (태스크 병렬화로 수정) |
 | search URL에 API 키 노출 | DRF 상세링크의 `OC=` 그대로 사용 |
+| 다른 도구 응답에도 API 키 노출 | 마스킹이 `api_url` 키에만 적용 → 모든 문자열에서 `OC=`를 가림 |
+| 부칙 조회 불가, `부칙 제5조`가 본문 제5조 반환 | 본문 응답의 `부칙`을 버림, 조문번호에서 숫자만 추출 |
+| 제11항 이후 항 조회 실패 | 원문자 표가 ⑩까지, 나머지는 목록 위치로 선택 |
+| 0건 검색이 1건으로 보고 | wrapper(Decc)가 데이터 키(decc)로 잡힘 |
+| 큰 검색 결과가 0건처럼 보임 | 크기 제한이 이스케이프 오차로 한도를 넘자 목록을 통째로 삭제 |
+| 폴백으로 복구한 본문이 사라짐 | 메타만 있는 조문단위를 원문으로 실어 content가 비워짐 |
 
 ---
 
@@ -138,4 +148,4 @@
 - **Git Bash의 curl은 한글을 cp949로 보내 0건이 나온다.** 한글 질의 테스트는 Python(UTF-8)으로.
 - PowerShell 5.1: `.ps1`은 UTF-8 **BOM** 필요, `Get-Content`는 `-Encoding UTF8` 필요, native exe stderr를 `2>`로 받지 말 것.
 - 데스크톱 로그: `%APPDATA%\Claude\logs\mcp-server-lexguard.log` (요청·응답 id가 남음). 2026-08-21 이후 로그 기록이 멈춘 상태 — 원인 미확인, 앱 쪽 문제로 보임.
-- 테스트: `.venv\Scripts\python.exe -m pytest tests -q` (406개).
+- 테스트: `.venv\Scripts\python.exe -m pytest tests -q` (452개).
