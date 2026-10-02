@@ -207,6 +207,8 @@ class BaseLawRepository:
         """URL에서 OC 파라미터를 마스킹하여 반환합니다."""
         if not url:
             return url
+        # httpx.URL을 그대로 넘기면 urlparse가 실패해 키가 든 원본이 로그에 남았다
+        url = str(url)
         try:
             parsed = urllib.parse.urlparse(url)
             query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
@@ -255,6 +257,26 @@ class BaseLawRepository:
                 "missing_reason": "API_ERROR_AUTH",
                 "error": "API 키 인증에 실패했습니다.",
                 "recovery_guide": "환경변수 LAW_API_KEY 또는 LAWGOKR_OC에 발급키를 설정하세요.",
+                "api_url": sanitized_url,
+                "status": status_code,
+                "content_type": content_type,
+                "short_snippet": short_snippet,
+            }
+
+        # 잘못된 키·미등록 IP는 401/403이 아니라 HTTP 200 JSON
+        # {"result": "사용자 정보 검증에 실패하였습니다.", "msg": "...IP주소...등록..."}
+        # 으로 온다. 그대로 넘기면 데이터 키가 없어 모든 도구가 조용히 0건이나
+        # "법령을 찾을 수 없음"으로 나가 원인을 알 수 없었다.
+        if is_json_or_xml and len(body) < 2000 and "사용자 정보 검증" in body:
+            logger.warning("DRF auth rejected | url=%s snippet=%r", sanitized_url, short_snippet)
+            return {
+                "error_code": "API_ERROR_AUTH",
+                "missing_reason": "API_ERROR_AUTH",
+                "error": "국가법령정보센터가 사용자 정보 검증에 실패했습니다 (미등록 IP 또는 잘못된 API 키).",
+                "recovery_guide": (
+                    "open.law.go.kr [OPEN API > API인증키관리]에서 키와 이 서버(PC)의 IP 등록을 "
+                    "확인하세요. 유동 IP 회선이나 Render처럼 나가는 IP가 바뀌는 환경은 다시 등록해야 합니다."
+                ),
                 "api_url": sanitized_url,
                 "status": status_code,
                 "content_type": content_type,
