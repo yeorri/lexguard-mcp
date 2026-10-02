@@ -83,6 +83,11 @@
 - **부칙**: 별도 API 없이 법령 본문(`target=law&MST=`) 응답의 `부칙.부칙단위`에 들어 있다. 현행본 하나에 제정·전부개정 이후 부칙이 모두 쌓여 있다(소득세법 시행령 1994년 이후 209건, 조특법 209건). `부칙공포번호`로 고른다(앞자리 0 있음: `04803`). 시행령 부칙은 시행령에, 법률 부칙은 법률에 있다.
 - 항번호는 원문자(`① `, 뒤에 공백)다. ⑳ 다음 ㉑~㉟·㊱~㊿는 다른 유니코드 블록이라 `unicodedata.numeric`으로 정수화한다. 항 필터(`HANG`)를 걸면 그 항 하나만 온다.
 
+### 인증 실패 응답
+- 잘못된 키·**미등록 IP**면 401/403이 아니라 **HTTP 200 JSON** `{"result": "사용자 정보 검증에 실패하였습니다.", "msg": "…IP주소 및 도메인주소를 등록해 주세요."}`가 온다(lawSearch·lawService 모두). `validate_drf_response`가 `API_ERROR_AUTH`로 바꾼다.
+- open.law.go.kr는 키 신청 시 요청 서버의 IP를 등록하게 한다. 지금은 Render·노트북 모두 정상 조회되지만, 위 오류가 나오면 [API인증키관리]에서 현재 IP(Render는 대시보드의 Outbound IP 목록)를 등록한다.
+- `health` 도구는 실제로 1회 호출해 인증 상태를 `api_connection`에 보고한다(원본에서 가져옴).
+
 ### 이 인증키로 안 되는 것
 - **이력 API**(`lsHstInf`·`lsJoHstInf`): 파라미터 무관 항상 totalCnt=0 (인증 오류 아님). 신청 목록에 '이력' 항목 없음.
 - **연혁 본문**(`lsHistory`): JSON 미지원, HTML만.
@@ -141,11 +146,24 @@
 
 ---
 
-## 7. 개발·검증 팁
+## 7. 원본(SeoNaRu) 동기화 기록
+
+갈라진 지점: `3a6a9f9` (2026-05-21). 2026-10-02에 원본 커밋 5개를 검토했다.
+
+| 원본 커밋 | 처리 | 이유 |
+|---|---|---|
+| `e450652` health 실제 인증 점검 | **가져옴** (`47c35f6`) | 충돌 없음. 같은 감지를 모든 도구로 넓힘(`f254601`) |
+| `83d4aa8` 공개 호스팅 종료·self-host 문서화 | 안 가져옴 | 코드 변경 없음. 원본 공개 서버(가짜 키) 종료에 맞춘 문서라 이 포크 운영과 다름. IP 등록 안내만 위에 반영 |
+| `eb9ea94`·`2e7872b` `.claude/settings.local.json` 추적 해제 | 보류 | 가져오면 사무실 PC에서 pull 시 그 파일이 삭제·충돌한다 |
+| `6f7da76` README 배지 | 안 가져옴 | 무관 |
+
+같은 질문 비교(원본 최신 vs 이 포크, 2026-10-02): 원본은 소령 §155㉓를 제목 한 줄로, 상증법 §53을 두문 없이 success로 반환했고, 해석례·부처해석·행정규칙·조세심판원은 0건, 헌재는 33건이라면서 빈 목록, 판례 상세링크에 키 노출, 잘못된 키를 "결과 없음"으로 보고했다.
+
+## 8. 개발·검증 팁
 
 - 로컬 검증: `run_stdio.py`에 JSON-RPC 줄을 stdin으로 넣으면 된다 (Claude 재시작 불필요).
 - 원격과 같은 실행 경로 검증: `uvicorn src.main:api` (Docker CMD와 동일).
 - **Git Bash의 curl은 한글을 cp949로 보내 0건이 나온다.** 한글 질의 테스트는 Python(UTF-8)으로.
 - PowerShell 5.1: `.ps1`은 UTF-8 **BOM** 필요, `Get-Content`는 `-Encoding UTF8` 필요, native exe stderr를 `2>`로 받지 말 것.
 - 데스크톱 로그: `%APPDATA%\Claude\logs\mcp-server-lexguard.log` (요청·응답 id가 남음). 2026-08-21 이후 로그 기록이 멈춘 상태 — 원인 미확인, 앱 쪽 문제로 보임.
-- 테스트: `.venv\Scripts\python.exe -m pytest tests -q` (452개).
+- 테스트: `.venv\Scripts\python.exe -m pytest tests -q` (462개).
