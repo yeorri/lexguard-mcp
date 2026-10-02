@@ -252,6 +252,11 @@ async def main() -> None:
             _write({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}})
             continue
 
+        if not isinstance(message, dict):
+            # 배치([...])나 원시값은 처리 태스크 안에서 .get()으로 죽어 응답이 없었다
+            _write({"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "Invalid Request"}})
+            continue
+
         # 요청마다 태스크로 띄운다. 예전에는 여기서 await 해버려 앞 요청이
         # 끝날 때까지 다음 줄을 읽지도 않았다. 클라이언트가 도구를 여러 개
         # 동시에 부르면 줄줄이 대기하다 무응답처럼 보였다.

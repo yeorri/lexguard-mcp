@@ -10,6 +10,9 @@ async def handle_law_article(arguments: dict, services: dict) -> dict:
     # 법령일련번호(MST)를 주면 그 시점 버전의 조문을 조회한다.
     # law_history_tool(version_list)로 과거 MST를 얻어 개정 전후를 대조할 때 쓴다.
     law_id = arguments.get("law_id") or arguments.get("mst")
+    if law_id is not None:
+        # JSON 클라이언트가 숫자로 보내면 저장소의 .strip()에서 죽는다
+        law_id = str(law_id).strip() or None
     article_number = arguments.get("article_number")
     hang = arguments.get("hang")
     ho = arguments.get("ho")
